@@ -343,7 +343,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.14.0</span></h1>
+      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.15.0</span></h1>
     </div>
     <div class="topctl">
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
@@ -368,7 +368,7 @@
             </div></details>
             <details class="dsec" data-tab="coach"><summary>🎯 教练复盘</summary><div class="dbody">
               <div style="margin-bottom:8px"><button class="act primary" id="btnDiag" style="min-width:130px;padding:9px 14px">运行行为诊断</button></div>
-              <div class="sub" style="margin-bottom:8px">决策时胜率 + 底池赔率判漏洞，不结果导向。含「上头」信号。<br><span style="color:var(--faint)">胜率=蒙特卡洛估算(非 GTO solver)；这是<b style="color:var(--dim)">漏洞检测</b>，不保证盈利。</span></div>
+              <div class="sub" style="margin-bottom:8px">决策时胜率+赔率、翻前范围表(RFI/push-fold)、outs 速算、SPR/隐含赔率启发式判漏洞，不结果导向。含「上头」信号。<br><span style="color:var(--faint)">范围表+启发式=职业玩家的速算工具，仍非 GTO solver；这是<b style="color:var(--dim)">漏洞检测</b>，不保证盈利。</span></div>
               <div id="coachOut"></div>
             </div></details>
             <details class="dsec" data-tab="pnl"><summary>📈 盈亏曲线</summary><div class="dbody">
@@ -428,7 +428,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">可验证德州扑克 · v0.14.0</div>
+      <div class="foottitle">可验证德州扑克 · v0.15.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -654,7 +654,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.14.0';
+var APP_VERSION='0.15.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -792,8 +792,20 @@ function applyAction(si,type,amt){
   if(si===0&&handRec){var _tc=currentBet-s.cStreet,_pb=totalPot(),_no=contenders().length-1,
     _tg=clamp(aggressionTightness(_tc,_pb)+0.06*Math.max(0,_no-1),.08,.9),
     _call=Math.min(_tc,s.stack);   // 面对超筹码 shove，价格封顶到可跟额
+    var _lo=contenders().filter(function(x){return x!==s;}),
+        _maxOppFull=_lo.length?Math.max.apply(null,_lo.map(function(o){return o.stack+o.cStreet;})):0;
     heroCtx={st:street,toCall:_tc,potBefore:_pb,nOpp:_no,mayRaise:s.mayRaise,
       board:board.map(code),hole:s.hole.map(code),          // 带上当手牌面 + 底牌,让点评自成上下文
+      hc:handCode(s.hole),pos:posName(0),                    // 范围表判定用:牌码 + 位置
+      firstIn:street==='preflop'&&!handRec.actions.some(function(a){return a.st==='preflop'&&(a.type==='call'||a.type==='raise');}),
+      hr:handRaises,raised:street==='preflop'&&currentBet>BB, // 面对第几次加注(3-bet 提示只对 hr===1)
+      heroRaisedPre:handRec.actions.some(function(a){return a.hero&&a.st==='preflop'&&a.type==='raise';}), // 自己开过局→trap call 不批评
+      effBB:Math.min(s.stack+s.cStreet,_maxOppFull||s.stack)/BB,     // 有效筹码(bb),push/fold 判定用
+      // SPR 用街初口径(双边都含本街已投注,底池扣掉本街注),否则对手下注后 SPR 被系统性低估(红队 v0.15)
+      spr:street==='preflop'?null:+(Math.min(s.stack+s.cStreet,_maxOppFull||s.stack)/Math.max(1,_pb-seats.reduce(function(a,x){return a+x.cStreet;},0))).toFixed(1),
+      outs:(street==='flop'||street==='turn')?countOuts(s.hole,board):null,
+      oppBehind:_lo.length?Math.max.apply(null,_lo.map(function(o){return o.stack;})):0, // 隐含赔率:还能从对手赢多少
+      heroStack:s.stack,
       eqv:equity(s.hole,board,board.length===0?220:150,_tg,Math.max(1,_no)),potOdds:_call>0?_call/(_pb+_call):0};}
   if(type==='fold'){s.folded=true;s.lastAction='弃牌';say(si,'fold');}
   else if(type==='check'){s.acted=true;s.lastAction='过牌';}
@@ -973,6 +985,96 @@ function verifyHandChain(){
   showModal('✓ 手历完整','哈希链完好，'+handLog.length+' 条记录无篡改。每条都绑定了当手 serverSeed，可独立复算发牌。',[{label:'好',fn:function(){}}]);
 }
 
+/* ==================== 教练 GTO 硬实力(v0.15):翻前范围表 + 翻后启发式 ====================
+   诚实边界:这是职业玩家用的「范围表 + 速算启发式」,不是 CFR solver。仍然:决策时判定、不结果导向。 */
+var RANKS_='23456789TJQKA';
+function rankCh(r){return RANKS_[r-2];}
+function handCode(h){var a=Math.max(h[0].r,h[1].r),b=Math.min(h[0].r,h[1].r);
+  if(a===b)return rankCh(a)+rankCh(a);
+  return rankCh(a)+rankCh(b)+(h[0].s===h[1].s?'s':'o');}
+// 紧凑范围记法解析:"22+ ATs+ KJs+ QJs AJo+" → {手牌码:1}。"ATs+"=踢脚从T升到K(同高张)。
+function parseRange(str){var out={};str.trim().split(/\s+/).forEach(function(t){
+  if(!t)return;var plus=/\+$/.test(t);t=t.replace('+','');
+  var hi=RANKS_.indexOf(t[0]),lo=RANKS_.indexOf(t[1]);
+  if(t[0]===t[1]){for(var j=hi;j<(plus?13:hi+1);j++)out[RANKS_[j]+RANKS_[j]]=1;}
+  else{var suf=t[2];if(plus){for(var k=lo;k<hi;k++)out[t[0]+RANKS_[k]+suf]=1;}else out[t[0]+t[1]+suf]=1;}
+});return out;}
+// 6-max 首入开牌(RFI)范围近似,按位置(UTG≈13% / MP-CO≈18% / BTN≈45% / SB≈34%)。HU 走专门降级(judgePreflop)。
+var RFI={
+  'UTG':  parseRange('22+ ATs+ KJs+ QJs JTs T9s 98s AJo+ KQo'),
+  'MP/CO':parseRange('22+ A8s+ A5s A4s KTs+ QTs+ J9s+ T9s 98s 87s ATo+ KJo+ QJo'),
+  'BTN':  parseRange('22+ A2s+ K2s+ Q6s+ J7s+ T6s+ 96s+ 85s+ 75s+ 64s+ 54s 43s A2o+ K7o+ Q8o+ J8o+ T8o+ 98o'),
+  'SB':   parseRange('22+ A2s+ K8s+ Q9s+ J9s+ T8s+ 97s+ 87s 76s 65s A8o+ KTo+ QTo+ JTo')};
+// ≤12bb 首入 push/fold(Nash 8-12bb 口径近似):后面人越少越宽。SB≈43% 贴 Nash,别用 BTN 表冤枉正确的 SB 全下。
+var PUSH_EARLY=parseRange('44+ A8s+ A5s KQs ATo+ KQo'),                                    // UTG ≈9%
+    PUSH_MID  =parseRange('22+ A2s+ A7o+ A5o KTs+ KJo+ QTs+ JTs T9s 98s'),                 // MP/CO ≈21%
+    PUSH_LATE =parseRange('22+ A2s+ K5s+ Q8s+ J8s+ T8s+ 98s 87s A2o+ K9o+ QTo+ JTo'),      // BTN ≈32%
+    PUSH_SB   =parseRange('22+ A2s+ A2o+ K2s+ K7o+ Q4s+ Q9o+ J6s+ J9o+ T6s+ T9o 96s+ 98o 86s+ 75s+ 65s 54s'); // SB ≈43%
+var PREMIUM_3BET=parseRange('JJ+ AQs+ AKo'); // 面对单次开局,平跟不如 3-bet 的牌
+function pushRange(pos){
+  if(seats.length===2)return PUSH_SB;                     // HU:按钮位=实质 SB
+  return pos==='SB'?PUSH_SB:pos==='BTN'?PUSH_LATE:pos==='MP/CO'?PUSH_MID:PUSH_EARLY;}
+// 数 outs(flop/turn):强 outs=升到顺子及以上的未见牌;中 outs=升到两对/三条。配 ×4/×2 速算。
+// 关键:最佳五张必须用到至少一张你的底牌——公共牌自己变好(四张同花/顺子在桌面)人人都有,不是你的 out(红队 v0.15)。
+function countOuts(hole,board){
+  if(board.length<3||board.length>4)return null;
+  var known=hole.concat(board),curC=Math.floor(evalBestOf(known)/759375),strong=0,med=0,deck=fullDeck();
+  for(var i=0;i<deck.length;i++){var c=deck[i];
+    if(known.some(function(k){return eqc(k,c);}))continue;
+    var seven=known.concat([c]),cat=Math.floor(evalBestOf(seven)/759375);
+    if(cat<=curC)continue;
+    var b5=best5cards(seven);
+    if(!b5.some(function(x){return eqc(x,hole[0])||eqc(x,hole[1]);}))continue;
+    if(cat>=4)strong++;else if(cat>=2)med++;}
+  return {strong:strong,med:med};
+}
+// 翻前判定器(coachComment 与 analyzeHand 共用):首入走范围表(短码 push/fold,深码 RFI);面对加注只管高级牌 3-bet 提示。
+// 返回 {v:'good'|'note'|'bad', msg} 或 null(交回胜率/赔率判)。
+function judgePreflop(ctx){
+  if(ctx.st!=='preflop'||!ctx.hc)return null;
+  var hc=ctx.hc,pos=ctx.pos,hu=seats.length===2;
+  if(!ctx.firstIn||pos==='BB'){
+    // 高级牌 3-bet 提示:只对"面对单次开局"(hr===1),且不是自己开局后被 3-bet 的 trap 场景、也得真加得动
+    if(ctx.raised&&ctx.toCall>0&&PREMIUM_3BET[hc]&&ctx.hr===1&&!ctx.heroRaisedPre&&ctx.mayRaise){
+      if(ctx.act==='call')return {v:'note',msg:'翻前 '+hc+' 面对开局只平跟:这种牌 3-bet 价值更大,平跟等着被后位挤压。'};
+      if(ctx.act==='raise')return {v:'good',msg:'翻前 '+hc+' 3-bet,标准施压。'};}
+    return null;
+  }
+  var ebb=Math.round(ctx.effBB);
+  if(ctx.effBB<=12){ // ---- 短码首入:push/fold(HU 用 SB 表) ----
+    var inP=pushRange(pos)[hc];
+    if(ctx.act==='fold')return inP?{v:'bad',msg:'短码('+ebb+'bb)首入,'+hc+' 在 '+pos+' 的 push 范围内——弃牌漏 EV,该直接全下。'}:null;
+    if(!inP)return hu?null:{v:'bad',msg:'短码('+ebb+'bb)用 '+hc+' 首入:不在 push/fold 范围,长期烧筹码。'}; // HU:表偏紧,范围外不判罪
+    if(ctx.act==='raise'&&ctx.amtTo>=Math.floor(ctx.effBB*BB*0.95))
+      return {v:'good',msg:'短码首入 '+hc+' 直接全下,符合 push/fold 表——不给对手便宜看牌。'};
+    return {v:'note',msg:'短码('+ebb+'bb)首入 '+hc+':范围内,但要么全下要么弃——小加注/平跟送对手完美反推空间。'};
+  }
+  if(hu)return null; // ---- HU 深码:6-max 表不适用(HU 应开 ~80%),不判,交回胜率规则 ----
+  if(ctx.act==='raise'){ // 深码首入先看尺寸:范围表只背书标准尺寸
+    if(ctx.amtTo>=ctx.effBB*BB*0.6)return null;            // 深码超大 shove:交回胜率/轻筹码规则,范围表不盖章
+    if(ctx.amtTo>5*BB)return {v:'note',msg:'首入开到 '+Math.round(ctx.amtTo/BB)+'bb(标准 2.2-3bb):尺寸失衡——赢的都是小池,输的才是大池。'};
+  }
+  var inR=(RFI[pos]||RFI['MP/CO'])[hc]; // ---- 深码首入:按位置 RFI ----
+  if(ctx.act==='fold')return inR?{v:'note',msg:pos+' 首入拿 '+hc+':在开牌范围内,弃掉偏紧——位置+主动权本来都能拿。'}:null;
+  if(ctx.act==='raise')return inR?{v:'good',msg:pos+' 首入 '+hc+' 开加注:标准开局(范围内)。'}
+    :{v:pos==='UTG'?'bad':'note',msg:pos+' 首入 '+hc+':超出该位置开牌范围'+(pos==='UTG'?',早位开垃圾牌最贵':'——偶尔偷盲可以,别成习惯')+'。'};
+  return inR?{v:'note',msg:hc+' 在 '+pos+' 开牌范围内:开加注比平跟好——limp 拿不到主动权也压不出人。'}
+    :{v:'bad',msg:pos+' 用 '+hc+' 平跟进池:范围外+无主动权,典型烧钱 limp。'};
+}
+// 强听牌 + 直接赔率缺口小 + 双边后手真够付 → 才可能被隐含赔率救回(红队 v0.15:赤字设上限、转牌更严、后手取双边最小值)
+function impliedOK(ctx){
+  if(ctx.st==='river'||ctx.eqv>=0.55||ctx.eqv<=0||ctx.toCall<=0)return false;
+  if(!ctx.outs||ctx.outs.strong<8)return false;
+  if(ctx.potOdds-ctx.eqv>(ctx.st==='flop'?0.12:0.06))return false;      // 缺口太大,隐含赔率救不动
+  var realizable=Math.min(ctx.oppBehind,ctx.heroStack-ctx.toCall);       // 未来真能赢到的钱受双方后手限制
+  var needed=ctx.toCall/ctx.eqv-(ctx.potBefore+ctx.toCall);              // 打平所需的未来赢取
+  return realizable>=needed*1.5;                                         // ×1.5:中牌也未必回回收到钱
+}
+function drawTxt(ctx){if(!ctx.outs||ctx.outs.strong<4||ctx.eqv>=0.55)return ''; // 已是强成手就别用"听牌"话术
+  var twoCards=ctx.st==='flop'&&(ctx.toCall>=ctx.heroStack||ctx.oppBehind===0); // ×4 只对"全下锁定看两张"成立
+  var m=twoCards?4:2;
+  return ctx.outs.strong+' outs 强听牌'+(twoCards?'≈'+Math.min(90,ctx.outs.strong*4)+'%(全下看两张×4)':'≈'+Math.min(90,ctx.outs.strong*2)+'%这条街(看一张×2)');}
+
 /* ==================== 教练模式（直播间式实时点评，本地规则） ==================== */
 function coachAppend(tone,msg){var box=$('coachChat');if(!box)return;
   var d=document.createElement('div');d.className='cmsg '+tone;
@@ -991,18 +1093,30 @@ function coachComment(ctx){
   if(!coachMode||!ctx)return;
   var bd=(ctx.board&&ctx.board.length)?' ['+ctx.board.join(' ')+']':''; // 带上当前牌面
   var st=RANKZH[ctx.st]+bd,eq=pctn(ctx.eqv),od=pctn(ctx.potOdds),msg,tone;
-  if(ctx.act==='call'&&ctx.toCall>0){
-    if(ctx.eqv<ctx.potOdds-0.04){tone='bad';msg=st+' 跟 '+ctx.toCall+'：胜率约 '+eq+'%，够不上底池赔率要的 '+od+'% → 亏 EV，黏太紧。';}
-    else if(ctx.eqv>ctx.potOdds+0.15){tone='good';msg=st+' 跟得对，胜率 '+eq+'% 远超所需 '+od+'%，甚至能考虑加注要价值。';}
-    else{tone='ok';msg=st+' 跟 '+ctx.toCall+' 合理，'+eq+'% vs 需 '+od+'%，临界偏正。';}
+  var pj=judgePreflop(ctx); // 翻前先过范围表(首入 RFI/push-fold + 高级牌 3-bet);没意见再落回胜率/赔率
+  if(pj){tone=pj.v==='bad'?'bad':pj.v==='good'?'good':'warn';msg=pj.msg;}
+  else if(ctx.act==='call'&&ctx.toCall>0){
+    var dtx=drawTxt(ctx);
+    if(ctx.eqv<ctx.potOdds-0.04){
+      if(impliedOK(ctx)){tone='warn';msg=st+' 跟 '+ctx.toCall+'：直接赔率不够（'+eq+'% vs 需 '+od+'%），但 '+dtx+' + 对手后手还有 '+fmt(ctx.oppBehind)+' → 隐含赔率勉强撑住。更好：偶尔改加注半诈唬，多一条赢法。';}
+      else{tone='bad';msg=st+' 跟 '+ctx.toCall+'：胜率约 '+eq+'%，够不上底池赔率要的 '+od+'%'+(dtx?'；'+dtx+'，隐含赔率也补不齐':'')+' → 亏 EV，黏太紧。';}}
+    else if(ctx.eqv>ctx.potOdds+0.15){tone='good';
+      msg=st+' 跟得对，胜率 '+eq+'% 远超所需 '+od+'%'+(dtx?'（'+dtx+'）':'')+
+        (ctx.eqv>=0.6?'，甚至能考虑加注要价值。':(dtx&&ctx.st!=='river'&&ctx.outs.strong>=8?'，也可考虑半诈唬加注。':'。'));}
+    else{tone='ok';msg=st+' 跟 '+ctx.toCall+' 合理，'+eq+'% vs 需 '+od+'%'+(dtx?'（'+dtx+'）':'')+'，临界偏正。';}
   }else if(ctx.act==='fold'&&ctx.toCall>0){
     if(ctx.eqv>ctx.potOdds+0.16){tone='bad';msg=st+' 这个弃牌亏了：你有约 '+eq+'% 胜率，只需 '+od+'% 就该跟——过度弃牌。';}
+    else if(impliedOK(ctx)){tone='warn';msg=st+' 弃了 '+drawTxt(ctx)+'：直接赔率确实不够，但后手深，隐含赔率下这个弃偏紧。';}
     else{tone='good';msg=st+' 好弃，'+eq+'% 不够 '+od+'% 的价。';}
   }else if(ctx.act==='raise'){
     if(ctx.eqv>0.6){tone='good';msg=st+' 加注要价值（'+eq+'%），打得好。';}
+    else if(ctx.outs&&ctx.outs.strong>=8&&ctx.st!=='river'&&drawTxt(ctx)){tone='good';msg=st+' 半诈唬加注（'+drawTxt(ctx)+'）：弃牌权益+听牌兜底，两条路赢，标准打法。';}
     else if(ctx.eqv<0.35){tone='warn';msg=st+' 低胜率（'+eq+'%）加注=诈唬，别 spew，得有弃牌权益才值。';}
     else{tone='ok';msg=st+' 加注（'+eq+'%），中等强度施压。';}
   }else return; // 过牌不评
+  // SPR 承诺提示:翻牌低 SPR + 有真实资产 → 计划打到底,别半途丢
+  if(ctx.st==='flop'&&ctx.spr!=null&&ctx.spr<=3&&ctx.eqv>=0.45&&(ctx.act==='call'||ctx.act==='raise'))
+    msg+=' SPR '+ctx.spr+'：底池已承诺，计划打到底。';
   if(handNo!==coachLastHand){coachHandDivider(ctx.hole);coachLastHand=handNo;} // 新的一手 → 先插分隔符
   coachAppend(tone,msg);
 }
@@ -1055,16 +1169,26 @@ function pctn(x){return Math.round(x*100);}
 function analyzeHand(rec){
   var out=[];
   (rec.heroDecisions||[]).forEach(function(d){
+    // 轻筹码大额投入检查先于范围表早退——深码 shove 不能因"牌在范围内"逃检(红队 v0.15)
+    if(d.act==='raise'&&d.amtTo>=rec.heroStart*0.6&&d.eqv<0.45&&d.mayRaise&&!(d.outs&&d.outs.strong>=8))
+      out.push({sev:'leak',msg:RANKZH[d.st]+'：以 ~'+pctn(d.eqv)+'% 胜率投入大额('+d.amtTo+') → 轻筹码送（除非纯诈唬）'});
+    var pj=judgePreflop(d); // 翻前范围表意见(首入/3-bet);有意见就用它,不再重复胜率规则
+    if(pj){if(pj.v==='bad')out.push({sev:'leak',msg:pj.msg});
+      else if(pj.v==='note')out.push({sev:'note',msg:pj.msg});
+      return;}
     if(d.act==='call'&&d.toCall>0){
-      if(d.eqv<d.potOdds-0.04) out.push({sev:'leak',msg:RANKZH[d.st]+'：用 ~'+pctn(d.eqv)+'% 胜率跟注 '+d.toCall+'，底池赔率需 '+pctn(d.potOdds)+'% → 亏 EV 跟注（黏性过高）'});
+      if(d.eqv<d.potOdds-0.04){
+        if(impliedOK(d)) out.push({sev:'note',msg:RANKZH[d.st]+'：跟 '+d.toCall+' 直接赔率不够（'+pctn(d.eqv)+'% vs 需 '+pctn(d.potOdds)+'%），靠 '+drawTxt(d)+'+深后手的隐含赔率撑住——可以，但别成瘾'});
+        else out.push({sev:'leak',msg:RANKZH[d.st]+'：用 ~'+pctn(d.eqv)+'% 胜率跟注 '+d.toCall+'，底池赔率需 '+pctn(d.potOdds)+'%'+(drawTxt(d)?'（'+drawTxt(d)+'，隐含赔率也补不齐）':'')+' → 亏 EV 跟注（黏性过高）'});}
       else if(d.eqv<d.potOdds+0.03) out.push({sev:'note',msg:RANKZH[d.st]+'：跟 '+d.toCall+' 是临界（胜率 '+pctn(d.eqv)+'% vs 需 '+pctn(d.potOdds)+'%）'});
     } else if(d.act==='fold'&&d.toCall>0){
       if(d.eqv>d.potOdds+0.16) out.push({sev:'leak',msg:RANKZH[d.st]+'：弃掉了 ~'+pctn(d.eqv)+'% 胜率的牌（只需 '+pctn(d.potOdds)+'%）→ 过度弃牌'});
-    } else if(d.act==='raise'&&d.toCall>0&&d.eqv<0.35){
+      else if(impliedOK(d)) out.push({sev:'note',msg:RANKZH[d.st]+'：弃了 '+drawTxt(d)+'——直接赔率不够没错，但后手深，隐含赔率下偏紧'});
+    } else if(d.act==='raise'&&d.toCall>0&&d.eqv<0.35&&!(d.outs&&d.outs.strong>=8)){
       out.push({sev:'note',msg:RANKZH[d.st]+'：低胜率(~'+pctn(d.eqv)+'%)加注——诈唬可以，若当价值则太薄'});
     }
-    if(d.act==='raise'&&d.amtTo>=rec.heroStart*0.6&&d.eqv<0.45&&d.mayRaise)
-      out.push({sev:'leak',msg:RANKZH[d.st]+'：以 ~'+pctn(d.eqv)+'% 胜率投入大额('+d.amtTo+') → 轻筹码送（除非纯诈唬）'});
+    if(d.st==='flop'&&d.spr!=null&&d.spr<=3&&d.eqv>=0.45&&d.act==='fold'&&d.toCall>0&&d.eqv>d.potOdds)
+      out.push({sev:'note',msg:'翻牌 SPR '+d.spr+' 已承诺底池,'+pctn(d.eqv)+'% 胜率还弃——低 SPR 下要么早弃要么打到底'});
   });
   // 非结果导向：只看决策，不看这手输赢（去掉 rec.net<0 条件，红队 L779）
   if(rec.wentSD&&(rec.heroDecisions||[]).some(d=>d.act==='call'&&d.st==='river'&&d.eqv<d.potOdds+0.05&&d.toCall>rec.heroStart*0.15))
@@ -1124,7 +1248,7 @@ function renderCoach(){
   var a=analyzeHistory();
   if(!a.enough){el.innerHTML='<div class="sub" style="padding:8px 2px">再玩几手（≥6）就能出行为诊断。当前 '+a.n+' 手。</div>';return;}
   var cat={};handLog.forEach(h=>(h.flags||[]).filter(f=>f.sev==='leak').forEach(f=>{
-    var k=/亏 EV 跟注/.test(f.msg)?'跟注太松（黏性）':/过度弃牌/.test(f.msg)?'面对下注过度弃牌':/轻筹码/.test(f.msg)?'轻筹码全下':'其它';
+    var k=/亏 EV 跟注/.test(f.msg)?'跟注太松（黏性）':/过度弃牌/.test(f.msg)?'面对下注过度弃牌':/轻筹码/.test(f.msg)?'轻筹码全下':/开牌范围|push|烧钱 limp|首入/.test(f.msg)?'翻前范围纪律':'其它';
     cat[k]=(cat[k]||0)+1;}));
   var top=Object.keys(cat).sort((x,y)=>cat[y]-cat[x])[0];
   var wtsd=heroCum.saw?Math.round(100*heroCum.sd/heroCum.saw):0;
