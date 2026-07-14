@@ -88,6 +88,10 @@
   .rdelta.up{color:#06210f;background:var(--win)}
   .rdelta.down{color:#2a0a0a;background:var(--loss)}
   .seat.won .cfg{box-shadow:0 0 0 2px var(--win),0 0 20px rgba(84,217,150,.5);border-radius:var(--r-md)}
+  /* 赢家牌型徽标（🏆 两对） */
+  .winlabel{display:inline-block;margin-top:3px;font-size:11px;font-weight:800;color:var(--brass-ink);
+    background:linear-gradient(180deg,#e7c476,var(--brass));border:1px solid #f0d9a0;border-radius:999px;
+    padding:1px 9px;box-shadow:0 2px 6px rgba(0,0,0,.45)}
   .cards{display:flex;gap:5px;justify-content:center;margin-top:5px}
   .cd{width:36px;height:50px;border-radius:6px;color:var(--card-black);
     background:linear-gradient(160deg,#fff,var(--card));
@@ -339,7 +343,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.13.1</span></h1>
+      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.14.0</span></h1>
     </div>
     <div class="topctl">
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
@@ -424,7 +428,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">可验证德州扑克 · v0.13.1</div>
+      <div class="foottitle">可验证德州扑克 · v0.14.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -572,6 +576,15 @@ function evalBestOf(cards){if(cards.length===5)return eval5(cards);if(cards.leng
   var s=eval5(sub);if(s>best)best=s;}return best;}
 var CATN=['高牌','一对','两对','三条','顺子','同花','葫芦','四条','同花顺'];
 function handName(c){return CATN[Math.floor(eval7(c)/759375)];}
+// 返回 7(或任意)张里构成最佳成手的那 5 张(赢家高亮用)
+function best5cards(cards){
+  if(cards.length<=5)return cards.slice();
+  var best=-1,bc=cards.slice(0,5);
+  var idx=cards.length===7?C7:combos(cards.map(function(_,i){return i;}),5);
+  for(var i=0;i<idx.length;i++){var cs=idx[i].map(function(x){return cards[x];}),s=eval5(cs);
+    if(s>best){best=s;bc=cs;}}
+  return bc;
+}
 function chenVal(r){return r===14?10:r===13?8:r===12?7:r===11?6:r/2;}
 function preflopStrength(h){
   var hi=Math.max(h[0].r,h[1].r),lo=Math.min(h[0].r,h[1].r),sc;
@@ -641,7 +654,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.13.1';
+var APP_VERSION='0.14.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -732,7 +745,8 @@ function startHand(){
   gen++;if(pendingTimer){clearTimeout(pendingTimer);pendingTimer=null;} // 作废上一手的挂起定时器
   seats.forEach(s=>{s.inHand=true;s.folded=false;s.allIn=false;s.revealed=false;
     s.hole=[];s.cStreet=0;s.cHand=0;s.acted=false;s.mayRaise=true;s.lastAction='';s.bubble='';
-    s.handStart=s.stack;s.resultDelta=null;}); // 每手起始筹码(算本手输赢)
+    s.handStart=s.stack;s.resultDelta=null;s.winHand='';}); // 每手起始筹码(算本手输赢)
+  lastWinCards=[]; // 清上一手的赢家高亮(eqc 按点花匹配,不清会串到新一手同名牌)
   handNo++;handDone=false;street='preflop';handRaises=0;board=[];
   heroFlags={vpip:false,pfr:false,saw:false,sd:false};
   heroStackStart=seats[0].stack;
@@ -840,15 +854,15 @@ function endStreet(){
   currentBet=0;minRaise=BB;
   if(street==='river'){showdown();return;}
   street=nextStreet(street);dealStreet();render();
-  if(canActList().length<=1){schedule(runoutNext,750);return;} // all-in: run it out
+  if(canActList().length<=1){schedule(runoutNext,heroOut()?250:750);return;} // all-in: run it out
   toAct=nextToAct(button);                 // 翻后首动=按钮左手第一个**还能行动**者（跳过 folded/allIn，红队 L709）
-  if(toAct==null){schedule(runoutNext,750);return;}
+  if(toAct==null){schedule(runoutNext,heroOut()?250:750);return;}
   render();promptOrBot();
 }
 function runoutNext(){
   if(handDone)return;
   if(street==='river'){showdown();return;}
-  street=nextStreet(street);dealStreet();render();schedule(runoutNext,750);
+  street=nextStreet(street);dealStreet();render();schedule(runoutNext,heroOut()?250:750);
 }
 function buildPots(){
   var live=seats.map((s,i)=>({i:i,amt:s.cHand,folded:s.folded||!s.inHand})),pots=[];
@@ -869,7 +883,7 @@ function showdown(){
     var r=rake;for(var pj=0;pj<pots.length&&r>0;pj++){var take=Math.min(r,pots[pj].amount);pots[pj].amount-=take;r-=take;}
     if(rake>0)log('抽水 '+rake+'（'+rakePct+'% 上限'+rakeCap+'）');}
   handRake=rake;
-  var msgs=[];
+  var msgs=[],hlDone=false;
   pots.forEach(function(pot,pi){
     if(pot.amount===0)return;
     var best=-1,winners=[];
@@ -879,7 +893,9 @@ function showdown(){
     // odd chips to winner(s) nearest the left of the button (first-to-act order)
     winners.sort((a,b)=>((a-button-1+seats.length)%seats.length)-((b-button-1+seats.length)%seats.length));
     var share=Math.floor(pot.amount/winners.length),rem=pot.amount-share*winners.length;
-    winners.forEach(function(i,idx){seats[i].stack+=share+(idx<rem?1:0);});
+    winners.forEach(function(i,idx){seats[i].stack+=share+(idx<rem?1:0);
+      seats[i].winHand=handName(seats[i].hole.concat(board));});   // 赢家记牌型(桌上显示"🏆 两对")
+    if(!hlDone){lastWinCards=best5cards(seats[winners[0]].hole.concat(board));hlDone=true;} // 主池首赢家:高亮构成最大成手的5张
     var label=pots.length>1?(pi===0?'主池':'边池'+pi):'底池';
     msgs.push(label+' '+fmt(pot.amount)+' → '+winners.map(i=>seats[i].name).join('、')+
       '（'+handName(seats[winners[0]].hole.concat(board))+'）');
@@ -1132,12 +1148,13 @@ function aggressionTightness(toCall,potNow){var t=0.12;
   t+=Math.min(0.22,0.10*Math.max(0,handRaises-1));
   if(street==='preflop'&&toCall<=BB)t=0.12;return t;}
 function schedule(fn,delay){var g=gen;pendingTimer=setTimeout(function(){pendingTimer=null;if(g!==gen)return;fn();},delay);}
+function heroOut(){return !seats[0]||!seats[0].inHand||seats[0].folded;} // 你已弃牌/不在手 → 机器人局 3 倍速快进
 function promptOrBot(){
   if(handDone)return;
   var s=seats[toAct];
   if(!s||s.folded||s.allIn||s.stack<=0){route();return;} // 纵深防御:绝不停在已弃牌/全下的座位（红队 L709）
   if(toAct===0){enableHero();return;}
-  disableHero();schedule(function(){decideSeat(toAct);},650+Math.random()*600);
+  disableHero();var d=650+Math.random()*600;schedule(function(){decideSeat(toAct);},heroOut()?d/3:d);
 }
 /* ---- 操作模型:座位 model≠local → 走中继决策;否则本地启发式 ---- */
 function styleName(x){if(!x.persona)return '';var P=x.persona;return (P.loose>0.55?'松':'紧')+'-'+(P.aggr>0.55?'凶':'被动');}
@@ -1284,7 +1301,8 @@ function render(){
     var cfgH='<div class="cfg" data-seat="'+k+'">'+(s.isHero?'':'<div class="av">'+s.emoji+'</div>')+ // hero 自己不显头像(省底部空间)
       '<div class="nm">'+s.name+(button===k?'<span class="dbtn">D</span>':'')+'</div>'+
       (s.isHero?'':'<div class="role">'+(s.persona.role||'')+'</div>')+
-      '<div class="stk">'+fmt(s.stack)+(handDone&&s.resultDelta?' <span class="rdelta '+(s.resultDelta>0?'up':'down')+'">'+(s.resultDelta>0?'+':'')+fmt(s.resultDelta)+'</span>':'')+'</div></div>';
+      '<div class="stk">'+fmt(s.stack)+(handDone&&s.resultDelta?' <span class="rdelta '+(s.resultDelta>0?'up':'down')+'">'+(s.resultDelta>0?'+':'')+fmt(s.resultDelta)+'</span>':'')+'</div>'+
+      (handDone&&s.winHand&&s.resultDelta>0?'<div><span class="winlabel">🏆 '+s.winHand+'</span></div>':'')+'</div>';
     var lastH='<div class="lastact">'+(s.lastAction||'')+'</div>';
     var betH='<div class="betchip">'+(s.cStreet?'🪙 '+fmt(s.cStreet):'')+'</div>';
     var cardsH='<div class="cards">';
