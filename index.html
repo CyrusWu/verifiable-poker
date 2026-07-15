@@ -364,6 +364,22 @@
   .prebtn{padding:6px 12px;font-size:12px;border-radius:9px;border:1px solid var(--line2);background:rgba(12,22,17,.8);color:var(--dim);cursor:pointer}
   .prebtn.on{color:var(--verify);border-color:var(--verify);background:var(--verify-lo)}
   #preRow,#skipRow{background:rgba(5,12,9,.6);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:11px;padding:6px 10px}
+
+  /* ---- v0.17 新手信息 HUD(决策前:位置/牌型/胜率) ---- */
+  #hudRow{background:rgba(6,14,10,.82);backdrop-filter:blur(6px);border:1px solid var(--line);
+    border-radius:12px;padding:7px 6px;gap:0;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  .hud-seg{display:flex;flex-direction:column;line-height:1.22;padding:0 12px;min-width:0}
+  .hud-seg+.hud-seg{border-left:1px solid var(--line)}
+  .hud-k{font-size:8.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px}
+  .hud-v{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--ink);white-space:nowrap}
+  .hud-sub{font-size:9.5px;color:var(--dim);white-space:nowrap}
+  .hud-seg.pos .hud-v{color:var(--verify)}
+  .hud-seg.eq .hud-v{font-variant-numeric:tabular-nums}
+  .eqhi{color:var(--win)!important}.eqmid{color:var(--brass)!important}.eqlo{color:var(--loss)!important}
+  .hudtoggle{margin-left:auto;align-self:center;width:20px;height:20px;line-height:1;padding:0;border-radius:6px;
+    background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--faint);cursor:pointer;font-size:11px}
+  .hudtoggle:hover{color:var(--ink)}
+  @media(max-width:640px){.hud-sub{display:none}.hud-seg{padding:0 8px}}
 </style>
 
 <div id="dupBanner" style="display:none;position:sticky;top:0;z-index:30;background:#3a1a1a;border-bottom:1px solid var(--loss);color:#ffd9d9;font-size:12.5px;padding:8px 14px;text-align:center">
@@ -372,7 +388,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.16.0</span></h1>
+      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.17.0</span></h1>
     </div>
     <div class="topctl">
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
@@ -414,6 +430,7 @@
 
         <!-- 操作按钮：紧凑，悬浮在 hero 手牌上方 -->
         <div class="controls" id="controls">
+          <div class="row" id="hudRow" style="display:none"></div>
           <div class="row" id="preRow" style="display:none">
             <span style="color:var(--dim);font-size:11px">预选</span>
             <button class="prebtn" id="preCF">过牌/弃牌</button>
@@ -466,7 +483,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">可验证德州扑克 · v0.16.0</div>
+      <div class="foottitle">可验证德州扑克 · v0.17.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -520,6 +537,7 @@
   <div class="field"><label>抽水上限（每手封顶）</label><input type="text" id="setRakeCap"></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setShowBB" style="width:auto"> 筹码/底池以大盲(bb)显示</label></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setFourColor" style="width:auto"> 四色牌（♠黑 ♥红 ♦蓝 ♣绿，色盲/无障碍）</label></div>
+  <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setHud" style="width:auto"> 新手提示 HUD（轮到你时显示位置/牌型/胜率，进阶后可关）</label></div>
   <div class="field"><label>单会话损失上限（0 = 关；到点强制休息）</label><input type="text" id="setLossCap"></div>
   <div class="field"><label>提醒间隔（分钟，0 = 关；到点弹休息提示）</label><input type="text" id="setRealityMin"></div>
   <div class="field"><label>操作模型中继地址（座位选了模型才用；需先跑 server/relay.js）</label><input type="text" id="setRelay"></div>
@@ -692,7 +710,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.16.0';
+var APP_VERSION='0.17.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -714,6 +732,7 @@ var coachMode=false, coachMin=false, coachPos=null; // 教练模式开关 + 悬�
 var turbo=false;                       // 跳过本局:所有延迟压到 ~20ms(v0.16)
 var preAction=null, preActionBet=0;    // 预选动作('checkfold'|'call')+选择时的注额(注变了自动取消)
 var heroStreak=0, prevBoardLen=0;      // 连胜计数 + 公共牌发牌动效基线
+var hudOn=true;                        // 新手信息 HUD 开关(默认开,进阶可关)(v0.17)
 var FX_REDUCED=false;try{FX_REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 
 /* seat factory */
@@ -731,7 +750,7 @@ function buildSeats(){
 function persist(){if(!isPrimary)return;try{localStorage.setItem('vpoker_multi',JSON.stringify(
   {v:3,pnlHistory:pnlHistory,cumNet:cumNet,heroCum:heroCum,selectedIds:selectedIds,handNo:handNo,
    rakePct:rakePct,rakeCap:rakeCap,showBB:showBB,fourColor:fourColor,lossCap:lossCap,realityMin:realityMin,relayURL:relayURL,
-   coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,heroStreak:heroStreak,history:handLog.slice(-300)}));}catch(e){}}
+   coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,heroStreak:heroStreak,hudOn:hudOn,history:handLog.slice(-300)}));}catch(e){}}
 function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi'));
   if(d&&d.v>=2){pnlHistory=d.pnlHistory||[];cumNet=d.cumNet||0;
     heroCum=Object.assign({hands:0,vpip:0,pfr:0,saw:0,sd:0,pb:0,pc:0},d.heroCum||{}); // 逐字段合并，加字段不腐坏
@@ -740,19 +759,19 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
     fourColor=!!d.fourColor;lossCap=d.lossCap||0;realityMin=(d.realityMin!=null)?d.realityMin:30;
     if(d.relayURL)relayURL=d.relayURL;
     coachMode=!!d.coachMode;coachMin=!!d.coachMin;coachPos=(d.coachPos&&typeof d.coachPos.x==='number')?d.coachPos:null;
-    heroStreak=d.heroStreak||0;
+    heroStreak=d.heroStreak||0;hudOn=(d.hudOn!==false);
     if(d.v>=3){handLog=d.history||[];
       // 手号跨会话单调，避免记录 # 重号（红队 L527）
       handNo=Math.max(d.handNo||0, handLog.reduce((m,r)=>Math.max(m,r.id||0),0));}}
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
-  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setModal').classList.add('open');};
+  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn;$('setModal').classList.add('open');};
 $('setSave').onclick=()=>{rakePct=clamp(parseFloat($('setRakePct').value)||0,0,20);
   rakeCap=Math.max(0,parseInt($('setRakeCap').value)||0);showBB=$('setShowBB').checked;
   fourColor=$('setFourColor').checked;lossCap=Math.max(0,parseInt($('setLossCap').value)||0);
   realityMin=Math.max(0,parseInt($('setRealityMin').value)||0);lastReality=Date.now();
-  relayURL=($('setRelay').value||'').trim()||relayURL;
+  relayURL=($('setRelay').value||'').trim()||relayURL;hudOn=$('setHud').checked;
   $('setModal').classList.remove('open');persist();render();updateStatsPanelAndChart();
   setStatus('设置已保存'+(rakePct>0?'（抽水 '+rakePct+'% · 上限 '+rakeCap+'）':''));};
 $('setClose').onclick=()=>$('setModal').classList.remove('open');
@@ -1470,6 +1489,58 @@ document.querySelectorAll('.quick').forEach(q=>q.onclick=()=>{var c=raiseCtx,pot
   v=Math.max(c.minTo,Math.min(c.maxTo,v));$('slider').value=v;$('amt').textContent=v;});
 $('btnNext').onclick=startHand;
 
+/* ==================== 新手信息 HUD (v0.17) ==================== */
+// 位置人话:名字 + 一句"为什么"。小白不用背"枪口位"——盘面直接告诉他。
+var POSZH={UTG:['枪口位 UTG','最早行动·打最紧'],'MP/CO':['中/后位','较后行动·可放宽'],
+  BTN:['按钮位 BTN','最后行动·最有利'],SB:['小盲 SB','翻后最先动·位置最差'],BB:['大盲 BB','已投盲·可宽防守']};
+// 一对的位置标签(顶对/超对/中对/弱对)
+function pairLabel(hole,board){
+  var hr=[hole[0].r,hole[1].r],br=board.map(function(c){return c.r;});
+  if(hr[0]===hr[1])return (br.every(function(r){return hr[0]>r;})?'超对':'口袋对')+' '+rankStr(hr[0]);
+  var paired=hr.filter(function(r){return br.indexOf(r)>=0;});
+  if(!paired.length)return '一对';
+  var pr=Math.max.apply(null,paired),sb=br.slice().sort(function(a,b){return b-a;}),rk=sb.indexOf(pr);
+  return (rk===0?'顶对':rk===1?'中对':'弱对')+' '+rankStr(pr);
+}
+// 牌型概念:翻前=起手分级,翻后=成手名+听牌
+function handDesc(hole,board){
+  if(board.length===0){var st=preflopStrength(hole);
+    return handCode(hole)+' · '+(st>0.82?'顶级起手':st>0.6?'强起手':st>0.42?'中等牌':st>0.28?'投机牌':'弱起手');}
+  // 用 evalBestOf 取成手类别:handName 硬编码 eval7 只吃 7 张,翻牌(5张)会崩
+  var nm=CATN[Math.floor(evalBestOf(hole.concat(board))/759375)],o=countOuts(hole,board),ex='';
+  if(o&&o.strong>=8)ex=' + 强听牌'+o.strong+'张';else if(o&&o.strong>=4)ex=' + 听牌'+o.strong+'张';
+  if(nm==='一对')nm=pairLabel(hole,board);
+  return nm+ex;
+}
+var hudCache={key:'',data:null};
+function heroHUD(){
+  var s=seats[0];
+  if(!hudOn||handDone||toAct!==0||!s.inHand||s.folded||s.allIn)return null;
+  var key=handNo+'|'+street+'|'+currentBet+'|'+board.length+'|'+s.cStreet;
+  if(hudCache.key===key)return hudCache.data;
+  var nOpp=contenders().length-1,potNow=totalPot(),toCall=currentBet-s.cStreet;
+  var tight=clamp(aggressionTightness(toCall,potNow)+0.06*Math.max(0,nOpp-1),.08,.9);
+  var eqv=equity(s.hole,board,board.length===0?220:150,tight,Math.max(1,nOpp));
+  var cc=Math.min(toCall,s.stack),potOdds=cc>0?cc/(potNow+cc):0;
+  hudCache={key:key,data:{pos:posName(0),nOpp:nOpp,eqv:eqv,toCall:cc,potOdds:potOdds,hand:handDesc(s.hole,board)}};
+  return hudCache.data;
+}
+function renderHUD(){
+  var row=$('hudRow');if(!row)return;
+  var d=heroHUD();
+  if(!d){row.style.display='none';return;}
+  var p=POSZH[d.pos]||[d.pos,''],eq=Math.round(d.eqv*100);
+  var ecls=eq>=55?'eqhi':eq>=35?'eqmid':'eqlo';
+  var eqSub=d.toCall>0?('跟需 '+Math.round(d.potOdds*100)+'%'):('vs '+d.nOpp+' 家');
+  row.innerHTML=
+    '<div class="hud-seg pos"><span class="hud-k">位置</span><span class="hud-v">'+p[0]+'</span><span class="hud-sub">'+p[1]+'</span></div>'+
+    '<div class="hud-seg"><span class="hud-k">你的牌</span><span class="hud-v">'+escapeHTML(d.hand)+'</span><span class="hud-sub">'+d.nOpp+' 个对手</span></div>'+
+    '<div class="hud-seg eq"><span class="hud-k">胜率</span><span class="hud-v '+ecls+'">'+eq+'%</span><span class="hud-sub">'+eqSub+'</span></div>'+
+    '<button class="hudtoggle" id="hudX" title="关闭新手提示（设置里可重开）">×</button>';
+  row.style.display='flex';
+  $('hudX').onclick=function(){hudOn=false;persist();renderHUD();setStatus('新手提示已关。设置里可重新打开。');};
+}
+
 /* ==================== 实体筹码 + 动效 (v0.16) ==================== */
 // 赌场面额色:500紫 100黑 25绿 5红 1灰白。数字标签永远是权威,堆只是视觉。
 var DENOMS=[[500,'#9b59b6'],[100,'#23282e'],[25,'#1e8f4e'],[5,'#c0392b'],[1,'#aeb8bf']];
@@ -1565,6 +1636,7 @@ function render(){
   t.querySelectorAll('.cfg').forEach(el=>el.onclick=()=>openConfig(+el.dataset.seat));
   prevBoardLen=board.length; // 发牌动效只给新翻出的牌
   renderPre();               // 预选/跳过按钮可见性
+  renderHUD();               // 新手信息 HUD(轮到你时的位置/牌型/胜率)
 }
 /* 预选动作 + 跳过按钮的可见性与状态(每次 render 后同步) */
 function renderPre(){
