@@ -304,6 +304,11 @@
   .ccbtn:hover{color:var(--ink);border-color:var(--dim)}
   .ccbtn.on{color:var(--brass-ink);background:linear-gradient(180deg,#e7c476,var(--brass));border-color:#f0d9a0;font-weight:700}
   .cfocus{font-size:9.5px;color:var(--brass);font-weight:600}
+  /* v0.19 AI 等级徽标 */
+  .tierb{display:inline-block;font-size:8px;font-weight:800;padding:0 4px;border-radius:4px;margin-left:4px;
+    background:rgba(67,214,195,.14);border:1px solid rgba(67,214,195,.42);color:var(--verify);
+    vertical-align:middle;letter-spacing:.02em}
+  .tierdesc{font-size:11px;color:var(--dim);margin-top:5px;line-height:1.5;min-height:16px}
 
   /* 左上抽屉菜单（通用二级折叠：设置 / 记录 / 复盘 / 盈亏 / 数据） */
   .drawerBtn{position:absolute;top:12px;left:12px;z-index:8;width:40px;height:40px;border-radius:10px;
@@ -398,7 +403,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.18.0</span></h1>
+      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.19.0</span></h1>
     </div>
     <div class="topctl">
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
@@ -498,7 +503,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">可验证德州扑克 · v0.18.0</div>
+      <div class="foottitle">可验证德州扑克 · v0.19.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -510,6 +515,10 @@
   <div class="field"><label>名字</label><input type="text" id="cfgName"></div>
   <div class="field"><label>头像 emoji</label><input type="text" id="cfgEmoji" maxlength="4"></div>
   <div class="field"><label>性格（展示用）</label><textarea id="cfgPersona"></textarea></div>
+  <div class="field"><label>AI 等级（这家的水平：范围质量 / 赔率纪律 / 剥削能力）</label>
+    <select id="cfgTier"></select>
+    <div class="modelnote" id="cfgTierDesc"></div>
+  </div>
   <div class="field"><label>打法风格（实时生效于决策）</label>
     <div class="slider-row"><span>松紧</span><input type="range" id="sLoose" min="0" max="100"><span class="v" id="vLoose">0</span></div>
     <div class="slider-row"><span>激进</span><input type="range" id="sAggr" min="0" max="100"><span class="v" id="vAggr">0</span></div>
@@ -537,6 +546,10 @@
 <!-- lobby modal -->
 <div class="modal" id="lobbyModal"><div class="sheet">
   <h2>牌桌设置 · 选谁陪你玩</h2>
+  <div class="field"><label>全桌 AI 难度</label>
+    <div class="ccbtns" id="tierBtns"></div>
+    <div class="tierdesc" id="tierDesc"></div>
+  </div>
   <div class="sub" style="margin-bottom:6px">勾选 1–5 个角色坐上你的桌（你固定在下方主位）。</div>
   <div class="roster" id="rosterList"></div>
   <div class="btnrow">
@@ -687,37 +700,37 @@ function equity(hole,board,iters,tightness,nOpp){
 var ROSTER=[
   {id:'champ',name:'陈冠军',emoji:'🏆',role:'职业竞赛冠军',
    persona:'冷静自律的锦标赛型选手，紧凶(TAG)，尊重位置，很少送钱，偶尔精准施压。',
-   loose:.38,aggr:.72,bluff:.34,sticky:.28,
+   loose:.38,aggr:.72,bluff:.34,sticky:.28,natTier:3,
    prompt:'你是一位职业德扑锦标赛冠军，冷静、克制、话不多但一针见血，偶尔点评对手的失误。',
    talk:{bet:['价值。','这里该下。','位置在我。'],raise:['加。','我代表强牌。','你想清楚。'],
      win:['意料之中。','谢谢送分。'],lose:['算你一次。','记下了。'],fold:['放掉，等好点子。'],bluff:['压力给到你。']}},
   {id:'whale',name:'老赵',emoji:'💰',role:'前土豪',
    persona:'松被动的钱多玩家(鱼)，什么牌都想看看，爱跟到底，偶尔感觉来了就疯狂超池。',
-   loose:.78,aggr:.36,bluff:.16,sticky:.82,
+   loose:.78,aggr:.36,bluff:.16,sticky:.82,natTier:1,
    prompt:'你是个有钱、爱玩、输赢不太在乎的前土豪，说话大方、爱吹、常说"小钱"。',
    talk:{bet:['来玩玩。','小钱，跟。'],raise:['感觉来了！','加点刺激。','梭一把？'],
      win:['哈哈这把爽！','钱嘛，再来。'],lose:['小意思，不影响。','再开一把！'],fold:['算了这把让你。'],bluff:['信不信我有！']}},
   {id:'prof',name:'K教授',emoji:'🧮',role:'职业数学家',
    persona:'紧、讲底池赔率、低诈唬、小球打法，接近 GTO，决策冷冰冰。',
-   loose:.32,aggr:.56,bluff:.2,sticky:.34,
+   loose:.32,aggr:.56,bluff:.2,sticky:.34,natTier:4,
    prompt:'你是位职业数学家，说话用赔率/EV/频率的语言，克制精确，不情绪化。',
    talk:{bet:['赔率支持下注。','按频率，下。'],raise:['期望为正，加。','你的跟注亏 EV。'],
      win:['如模型所料。','方差回归。'],lose:['样本噪声。','长期我赢。'],fold:['底池赔率不够，弃。'],bluff:['这里诈唬有 fold equity。']}},
   {id:'maniac',name:'阿飞',emoji:'🔥',role:'激进网红',
    persona:'松凶(LAG)疯子，高频加注、高诈唬、大注施压，很上头。',
-   loose:.6,aggr:.9,bluff:.55,sticky:.4,
+   loose:.6,aggr:.9,bluff:.55,sticky:.4,natTier:2,
    prompt:'你是个爱表演的激进主播，话痨、爱挑衅、爱制造戏剧感。',
    talk:{bet:['冲！','看我的。','怕了吧？'],raise:['再加！','全场最靓的注！','受不了了加爆！'],
      win:['哈哈哈就是这样！','送我送我！'],lose:['运气而已！','下把弄回来！'],fold:['这把不玩了。'],bluff:['我诈唬了你敢跟吗？']}},
   {id:'rock',name:'石老板',emoji:'🗿',role:'老银行家',
    persona:'岩石(nit)，超紧，只玩顶级牌，几乎不诈唬，价值为王。',
-   loose:.18,aggr:.5,bluff:.08,sticky:.24,
+   loose:.18,aggr:.5,bluff:.08,sticky:.24,natTier:3,
    prompt:'你是位保守的老银行家，惜字如金、谨慎、看重确定性。',
    talk:{bet:['有把握才下。','稳。'],raise:['我有牌。','加。'],
      win:['稳健取胜。'],lose:['罕见。'],fold:['不值得。','弃。'],bluff:['……']}},
   {id:'aunt',name:'林姐',emoji:'🌸',role:'谨慎跟注型',
    persona:'紧被动，牌不错就跟，很少加注，喜欢看摊牌，温和。',
-   loose:.42,aggr:.3,bluff:.1,sticky:.6,
+   loose:.42,aggr:.3,bluff:.1,sticky:.6,natTier:1,
    prompt:'你是位温和谨慎的阿姨型玩家，客气、爱聊天、下注前爱犹豫。',
    talk:{bet:['试试看这注。','来一点点。'],raise:['那…我加一点？'],
      win:['运气不错呢~','谢谢啦。'],lose:['哎呀。','没事没事。'],fold:['这把我不跟啦。'],bluff:['我是不是太大胆了~']}}
@@ -725,7 +738,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.18.0';
+var APP_VERSION='0.19.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -737,6 +750,7 @@ var handLog=[], handRec=null;         // 完整手牌历史（陪练系统的数
 var heroFlags={vpip:false,pfr:false,saw:false,sd:false};
 var heroCum={hands:0,vpip:0,pfr:0,saw:0,sd:0,pb:0,pc:0};
 var selectedIds=['champ','prof','whale']; // opponents at table
+var tableTier=0;  // 全桌 AI 难度:0=混合(按角色天然等级) / 1-5=全桌统一等级(v0.19)
 var rakePct=0,rakeCap=30,showBB=false; // house cut + big-blind display (settings a newbie spec forgets)
 var fourColor=false, lossCap=0, realityMin=30;                 // 无障碍 + 责任博弈设置
 var sessionStart=Date.now(), sessionHands=0, sessionNet=0, sessionRebuys=0, lastReality=Date.now(); // 会话追踪
@@ -759,7 +773,9 @@ function makeSeat(persona,isHero){
 }
 function buildSeats(){
   seats=[makeSeat({name:'你',emoji:'🧑',role:'Hero',loose:0,aggr:0,bluff:0,sticky:0,persona:'',prompt:'',talk:{}},true)];
-  selectedIds.forEach(id=>{var p=ROSTER.find(r=>r.id===id);if(p)seats.push(makeSeat(clonePersona(p),false));});
+  selectedIds.forEach(id=>{var p=ROSTER.find(r=>r.id===id);if(p){var c=clonePersona(p);
+    c.tier=tableTier||c.natTier||2; // 0=混合→用角色天然等级;否则全桌统一
+    seats.push(makeSeat(c,false));}});
 }
 
 /* ==================== persistence ==================== */
@@ -767,7 +783,7 @@ function persist(){if(!isPrimary)return;try{localStorage.setItem('vpoker_multi',
   {v:3,pnlHistory:pnlHistory,cumNet:cumNet,heroCum:heroCum,selectedIds:selectedIds,handNo:handNo,
    rakePct:rakePct,rakeCap:rakeCap,showBB:showBB,fourColor:fourColor,lossCap:lossCap,realityMin:realityMin,relayURL:relayURL,
    coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,coachStyle:coachStyle,coachFocus:coachFocus,
-   heroStreak:heroStreak,hudOn:hudOn,history:handLog.slice(-300)}));}catch(e){}}
+   heroStreak:heroStreak,hudOn:hudOn,tableTier:tableTier,history:handLog.slice(-300)}));}catch(e){}}
 function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi'));
   if(d&&d.v>=2){pnlHistory=d.pnlHistory||[];cumNet=d.cumNet||0;
     heroCum=Object.assign({hands:0,vpip:0,pfr:0,saw:0,sd:0,pb:0,pc:0},d.heroCum||{}); // 逐字段合并，加字段不腐坏
@@ -778,6 +794,7 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
     coachMode=!!d.coachMode;coachMin=!!d.coachMin;coachPos=(d.coachPos&&typeof d.coachPos.x==='number')?d.coachPos:null;
     if(COACH_STYLES[d.coachStyle])coachStyle=d.coachStyle;if(FOCUS_ZH[d.coachFocus])coachFocus=d.coachFocus;
     heroStreak=d.heroStreak||0;hudOn=(d.hudOn!==false);
+    if(d.tableTier>=0&&d.tableTier<=5)tableTier=d.tableTier|0;
     if(d.v>=3){handLog=d.history||[];
       // 手号跨会话单调，避免记录 # 重号（红队 L527）
       handNo=Math.max(d.handNo||0, handLog.reduce((m,r)=>Math.max(m,r.id||0),0));}}
@@ -1489,42 +1506,97 @@ function applyModelDecision(si,d){
     if(!amt||amt<=currentBet)applyAction(si,toCall===0?'check':'call');else applyAction(si,'raise',amt);}
   else botDecide(si); // 未知动作→回退
 }
+/* ==================== AI 分级 (v0.19) ====================
+ * 等级差 = 范围质量 + 位置意识 + 赔率纪律 + 剥削能力。**绝不作弊看底牌**——
+ * 每级都只用自己的底牌+公共牌+公开动作,和你看到的信息对称。
+ *   range  : 估胜率时对"对手范围"的认知(0=以为对手random→高估自己烂牌)
+ *   slack  : 赔率纪律松紧(正=乱跟, 负=要求更高胜率才跟)
+ *   tables : 是否按 RFI/push-fold 范围表开局(职业打法)
+ *   draws  : 半诈唬是否必须有真听牌(false=乱诈唬)
+ *   exploit: 是否盯你的统计漏洞反打
+ */
+var AI_TIERS={
+ 1:{n:'鱼',    b:'L1',d:'松被动·什么牌都想看看·不看位置', iters:70, range:0,  pos:false,tables:false,slack:0.18, sticky:0.5, bluffX:0.4, draws:false,exploit:false,tightX:0.5},
+ 2:{n:'常客',  b:'L2',d:'凭感觉打·有基本赔率概念',       iters:130,range:1,  pos:false,tables:false,slack:0.03, sticky:0,   bluffX:1,   draws:false,exploit:false,tightX:1},
+ 3:{n:'紧凶',  b:'L3',d:'讲位置·守赔率·半诈唬要有听牌',  iters:190,range:1,  pos:true, tables:false,slack:0,    sticky:-0.1,bluffX:1,   draws:true, exploit:false,tightX:1.2},
+ 4:{n:'范围高手',b:'L4',d:'按 RFI/push 范围表开局·纪律严',iters:240,range:1,  pos:true, tables:true, slack:-0.02,sticky:-0.15,bluffX:0.85,draws:true,exploit:false,tightX:1.2},
+ 5:{n:'宗师',  b:'L5',d:'范围表 + 盯你的统计漏洞反打你',  iters:300,range:1,  pos:true, tables:true, slack:-0.03,sticky:-0.2,bluffX:0.85,draws:true, exploit:true, tightX:1.2}
+};
+function tierOf(s){return AI_TIERS[s&&s.persona&&s.persona.tier]||AI_TIERS[2];}
+// L5 剥削用:统计你面对下注时的弃牌率(只用公开信息——你的动作,不是你的牌)
+var htCache={h:-1,d:null};
+function heroTendency(){
+  if(htCache.h===handNo)return htCache.d;
+  var faced=0,folded=0;
+  handLog.slice(-30).forEach(function(h){(h.heroDecisions||[]).forEach(function(d){
+    if(d.toCall>0){faced++;if(d.act==='fold')folded++;}});});
+  htCache={h:handNo,d:(faced>=8?{n:faced,fold:folded/faced}:null)};
+  return htCache.d;
+}
 function botDecide(si){
   if(handDone||toAct!==si||si===0)return;var s=seats[si]; // si===0: bots 永不替 hero 行动（红队 L860）
   if(!(s.inHand&&!s.folded&&!s.allIn)){route();return;}
-  var P=s.persona,toCall=currentBet-s.cStreet,potNow=totalPot(),maxTo=s.cStreet+s.stack;
+  var P=s.persona,T=tierOf(s),toCall=currentBet-s.cStreet,potNow=totalPot(),maxTo=s.cStreet+s.stack;
   var minTo=Math.max(currentBet+minRaise,currentBet+BB,BB);if(currentBet===0)minTo=Math.min(BB,maxTo);
   var rnd=Math.random(),nOpp=contenders().length-1;
-  var tight=clamp(aggressionTightness(toCall,potNow)+0.06*Math.max(0,nOpp-1),0.08,0.9);
-  var eqv=equity(s.hole,board,board.length===0?200:140,tight,Math.max(1,nOpp));
+  // 范围认知:range=0 的鱼以为对手是随机牌 → 系统性高估自己的烂牌(这是它弱的根源,不是它看不见牌)
+  var tight=clamp((aggressionTightness(toCall,potNow)+0.06*Math.max(0,nOpp-1))*T.range,0,0.9);
+  var eqv=equity(s.hole,board,T.iters,tight,Math.max(1,nOpp));
+  // 剥削层(仅 L5):你太爱弃→多诈唬你;你太爱跟→别诈唬,只要薄价值
+  var ht=T.exploit?heroTendency():null,bx=T.bluffX,valueAdj=0;
+  if(ht){ if(ht.fold>0.60)bx*=1.9; else if(ht.fold<0.28){bx*=0.25;valueAdj=-0.08;} }
   function act(t,a){applyAction(si,t,a);}
+  function hasDraw(){if(board.length>=5)return true;      // 河牌无听牌可言,允许低频纯诈唬
+    var o=countOuts(s.hole,board);return !!(o&&o.strong>=8);}
   function raiseTo(frac){if(!s.mayRaise){act(toCall===0?'check':'call');return;} // respect incomplete-raise lock
     frac*=0.88+Math.random()*0.24; // ±12% 尺度噪声：别让下注量成为确定性 tell
     var v=(currentBet>0?currentBet:0)+Math.round(potNow*frac);
     v=Math.max(minTo,Math.min(maxTo,v));if(v<=currentBet){act(toCall===0?'check':'call');return;}act('raise',v);}
   if(street==='preflop'){
-    var ps=preflopStrength(s.hole),entry=0.55-P.loose*0.42,openR=0.6-P.loose*0.28;
+    // ---- L4/L5:按范围表开局(和教练同一套表) ----
+    if(T.tables){
+      var pos=posName(si),hc=handCode(s.hole),mo=0;
+      contenders().forEach(function(x){if(x!==s)mo=Math.max(mo,x.stack+x.cStreet);});
+      var eff=Math.min(s.stack+s.cStreet,mo||s.stack)/BB;
+      var firstIn=!handRec||!handRec.actions.some(function(a){return a.st==='preflop'&&(a.type==='call'||a.type==='raise');});
+      if(firstIn&&pos!=='BB'){
+        if(eff<=12){ if(pushRange(pos)[hc]){act('raise',maxTo);return;}          // 短码:要么全下要么弃
+          act(toCall===0?'check':'fold');return; }
+        if((RFI[pos]||RFI['MP/CO'])[hc]){raiseTo(1.1);return;}                    // 深码:范围内 ~2.6bb 开
+        act(toCall===0?'check':'fold');return;
+      }
+      if(toCall>BB){ // 面对开局:高级牌 3-bet,中等牌跟,其余弃
+        if(PREMIUM_3BET[hc]&&rnd<0.8){raiseTo(1.0);return;}
+        if(preflopStrength(s.hole)>0.6){act('call');return;}
+        act('fold');return;
+      }
+    }
+    // ---- L1-L3:手牌强度 + (L3)位置意识 ----
+    var pm=1;
+    if(T.pos){var pn=posName(si);pm=pn==='BTN'?1.35:pn==='BB'?1.2:pn==='SB'?1.1:pn==='MP/CO'?1.0:0.72;} // UTG 最紧
+    var ps=preflopStrength(s.hole),entry=(0.55-P.loose*0.42)*T.tightX/pm,openR=(0.6-P.loose*0.28)*T.tightX/pm;
     if(toCall<=BB){
       if(ps>openR&&rnd<0.4+P.aggr*0.5){raiseTo(0.9+P.aggr*0.6);return;}
       if(ps>entry){act(toCall===0?'check':'call');return;}
       if(toCall===0){act('check');return;}
-      if(rnd<P.sticky*0.5){act('call');return;}act('fold');return;
+      if(rnd<Math.max(0,P.sticky+T.sticky)*0.5){act('call');return;}act('fold');return;
     }else{
       if(ps>0.8&&rnd<0.3+P.aggr*0.5){raiseTo(1.0);return;}
-      if(ps>(0.5-P.loose*0.28)){if(ps>0.66&&rnd<P.aggr*0.5){raiseTo(1.0);return;}act('call');return;}
-      if(rnd<P.sticky*0.3){act('call');return;}act('fold');return;
+      if(ps>(0.5-P.loose*0.28)*T.tightX){if(ps>0.66&&rnd<P.aggr*0.5){raiseTo(1.0);return;}act('call');return;}
+      if(rnd<Math.max(0,P.sticky+T.sticky)*0.3){act('call');return;}act('fold');return;
     }
   }
   if(toCall===0){
-    if(eqv>0.62-P.aggr*0.14){raiseTo(0.5+P.aggr*0.35);return;}
-    if(rnd<P.bluff*0.5&&maxTo>minTo){raiseTo(0.5+P.aggr*0.25);say(si,'bluff');return;}
+    if(eqv>0.62-P.aggr*0.14+valueAdj){raiseTo(0.5+P.aggr*0.35);return;}
+    if(rnd<P.bluff*0.5*bx&&maxTo>minTo&&(!T.draws||hasDraw())){raiseTo(0.5+P.aggr*0.25);say(si,'bluff');return;}
     act('check');return;
   }else{
     var odds=toCall/(potNow+toCall);
-    if(eqv>0.72-P.aggr*0.12&&maxTo>minTo&&rnd<0.5+P.aggr*0.4){raiseTo(0.7+P.aggr*0.3);return;}
-    if(eqv>=odds+(0.03-P.sticky*0.09)){act('call');return;}
-    if(eqv>odds-0.05&&rnd<P.sticky*0.6){act('call');return;}
-    if(rnd<P.bluff*0.14&&board.length>=3&&maxTo>minTo){raiseTo(0.8);say(si,'bluff');return;}
+    if(eqv>0.72-P.aggr*0.12+valueAdj&&maxTo>minTo&&rnd<0.5+P.aggr*0.4){raiseTo(0.7+P.aggr*0.3);return;}
+    // 赔率纪律:slack 正=乱跟(鱼),负=要求更高胜率才跟(高手)
+    if(eqv>=odds+(0.03-P.sticky*0.09)-T.slack){act('call');return;}
+    if(eqv>odds-0.05-T.slack&&rnd<Math.max(0,P.sticky+T.sticky)*0.6){act('call');return;}
+    if(rnd<P.bluff*0.14*bx&&board.length>=3&&maxTo>minTo&&(!T.draws||hasDraw())){raiseTo(0.8);say(si,'bluff');return;}
     act('fold');return;
   }
 }
@@ -1692,7 +1764,7 @@ function render(){
     var s=seats[k],pos=L[k],isTurn=(!handDone&&toAct===k);
     var cfgH='<div class="cfg" data-seat="'+k+'">'+(s.isHero?'':'<div class="av">'+s.emoji+'</div>')+ // hero 自己不显头像(省底部空间)
       '<div class="nm">'+s.name+(button===k?'<span class="dbtn">D</span>':'')+'</div>'+
-      (s.isHero?'':'<div class="role">'+(s.persona.role||'')+'</div>')+
+      (s.isHero?'':'<div class="role">'+(s.persona.role||'')+'<span class="tierb" title="'+tierOf(s).n+'：'+tierOf(s).d+'">'+tierOf(s).b+'</span></div>')+
       '<div class="stk">'+fmt(s.stack)+(handDone&&s.resultDelta?' <span class="rdelta '+(s.resultDelta>0?'up':'down')+'">'+(s.resultDelta>0?'+':'')+fmt(s.resultDelta)+'</span>':'')+'</div>'+
       (handDone&&s.winHand&&s.resultDelta>0?'<div><span class="winlabel">🏆 '+s.winHand+'</span></div>':'')+'</div>';
     var lastH='<div class="lastact">'+(s.lastAction||'')+'</div>';
@@ -1779,6 +1851,10 @@ function openConfig(si){
   $('cfgTitle').textContent='配置 · '+s.emoji+' '+s.name;
   $('cfgName').value=s.name;$('cfgEmoji').value=s.emoji;$('cfgPersona').value=P.persona||'';
   $('cfgPrompt').value=P.prompt||'';$('cfgModel').value=P.model||'local';
+  $('cfgTier').innerHTML=[1,2,3,4,5].map(function(i){return '<option value="'+i+'">'+AI_TIERS[i].b+' '+AI_TIERS[i].n+'</option>';}).join('');
+  $('cfgTier').value=String(P.tier||P.natTier||2);
+  $('cfgTierDesc').textContent=AI_TIERS[$('cfgTier').value].d;
+  $('cfgTier').onchange=function(){$('cfgTierDesc').textContent=AI_TIERS[$('cfgTier').value].d;};
   setSlider('sLoose','vLoose',P.loose);setSlider('sAggr','vAggr',P.aggr);
   setSlider('sBluff','vBluff',P.bluff);setSlider('sSticky','vSticky',P.sticky);
   $('cfgModal').classList.add('open');
@@ -1789,6 +1865,7 @@ function setSlider(sid,vid,val){$(sid).value=Math.round(val*100);$(vid).textCont
 $('cfgSave').onclick=()=>{var s=seats[cfgSeat],P=s.persona;
   s.name=$('cfgName').value||s.name;s.emoji=$('cfgEmoji').value||s.emoji;P.name=s.name;P.emoji=s.emoji;
   P.persona=$('cfgPersona').value;P.prompt=$('cfgPrompt').value;P.model=$('cfgModel').value;
+  P.tier=+$('cfgTier').value||2;
   P.loose=+$('sLoose').value/100;P.aggr=+$('sAggr').value/100;P.bluff=+$('sBluff').value/100;P.sticky=+$('sSticky').value/100;
   $('cfgModal').classList.remove('open');render();
   setStatus('已更新 '+s.name+' 的配置'+(P.model!=='local'?'（模型「'+P.model+'」将用于未来对话层，决策仍走本地引擎）':''));};
@@ -1796,8 +1873,19 @@ $('cfgClose').onclick=()=>$('cfgModal').classList.remove('open');
 $('cfgSwap').onclick=()=>{$('cfgModal').classList.remove('open');openLobby();};
 
 /* ==================== lobby ==================== */
+// 全桌难度选择器(0=混合,1-5=统一等级)
+function renderTierPicker(){
+  var el=$('tierBtns'),ds=$('tierDesc');if(!el)return;
+  var opts=[{k:0,n:'混合',d:'每个角色按自己的天然水平打（老赵是鱼、K教授是范围高手）——最像真实牌桌。'}];
+  [1,2,3,4,5].forEach(function(i){opts.push({k:i,n:AI_TIERS[i].b+' '+AI_TIERS[i].n,d:AI_TIERS[i].d});});
+  el.innerHTML=opts.map(function(o){return '<button class="ccbtn'+(tableTier===o.k?' on':'')+'" data-tier="'+o.k+'">'+o.n+'</button>';}).join('');
+  var cur=opts.filter(function(o){return o.k===tableTier;})[0];
+  ds.textContent=cur?cur.d:'';
+  el.querySelectorAll('[data-tier]').forEach(function(b){b.onclick=function(){
+    tableTier=+b.getAttribute('data-tier');persist();renderTierPicker();};});
+}
 function openLobby(){
-  closeDrawer();
+  closeDrawer();renderTierPicker();
   $('rosterList').innerHTML=ROSTER.map(function(p){var on=selectedIds.indexOf(p.id)>=0;
     return '<div class="rcard'+(on?' on':'')+'" data-id="'+p.id+'"><div class="av">'+p.emoji+
       '</div><div><div class="t">'+p.name+' <span style="color:var(--dim);font-weight:400">'+p.role+
