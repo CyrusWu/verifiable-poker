@@ -403,7 +403,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.19.0</span></h1>
+      <h1>♠ 可验证德州扑克 <span style="color:var(--dim);font-weight:400;font-size:14px">· 多人桌</span> <span class="ver" id="verBadge">v0.20.0</span></h1>
     </div>
     <div class="topctl">
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
@@ -435,6 +435,19 @@
               <div class="pnlhead"><span class="sub">累计净额 · 跨会话保存</span><span class="pnlval" id="pnlNow"></span></div>
               <div class="pnlwrap" id="pnlChart"></div>
               <div style="text-align:right;margin-top:8px"><button class="btnlink" id="resetPnl">清空曲线</button></div>
+            </div></details>
+            <details class="dsec" data-tab="ladder"><summary>🏆 天梯</summary><div class="dbody">
+              <div id="ladderMe"></div>
+              <div class="field" style="margin:8px 0"><label>昵称（上榜用，≤16 字）</label>
+                <input type="text" id="ladderNick" maxlength="16" placeholder="给自己起个名"></div>
+              <div class="btnrow" style="margin-top:8px">
+                <button class="btnlink" id="btnLadderRefresh">刷新榜单</button>
+                <button class="act primary" id="btnLadderSubmit" style="min-width:130px;padding:9px 14px">上传我的成绩</button>
+              </div>
+              <div id="ladderBoard" style="margin-top:10px"></div>
+              <div class="note">🤝 <b>诚实榜</b>：成绩在你本地算完上传，目前<b>不做校验</b>——朋友之间玩，靠自觉。<br>
+                身份 = 浏览器本地 ID：换浏览器 / 清缓存 = 身份丢失，得重来。<br>
+                积分 = Σ(每手净额 ÷ 大盲 × 桌面等级系数)。系数：L1 鱼 ×0.2 → L5 宗师 ×3.5——<b>虐鱼几乎不加分，赢宗师才值钱</b>。</div>
             </div></details>
             <details class="dsec" data-tab="stats"><summary>📊 数据</summary><div class="dbody"><table class="statstab" id="statsTab"></table></div></details>
           </div>
@@ -503,7 +516,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">可验证德州扑克 · v0.19.0</div>
+      <div class="foottitle">可验证德州扑克 · v0.20.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -569,6 +582,7 @@
   <div class="field"><label>单会话损失上限（0 = 关；到点强制休息）</label><input type="text" id="setLossCap"></div>
   <div class="field"><label>提醒间隔（分钟，0 = 关；到点弹休息提示）</label><input type="text" id="setRealityMin"></div>
   <div class="field"><label>操作模型中继地址（座位选了模型才用；需先跑 server/relay.js）</label><input type="text" id="setRelay"></div>
+  <div class="field"><label>天梯服务地址（留空=天梯未开通；部署见 server/ladder/README）</label><input type="text" id="setLadder" placeholder="https://xxx.workers.dev"></div>
   <div class="note">责任博弈：破产不再静默补码，要你亲手点确认；到损失上限/时长会拦你一下——给"上头时"装一道自然刹车。抽水默认 0，调到 5% 玩几十手，能直观看到盈亏曲线被手续费吃掉。</div>
   <div class="btnrow"><button class="act primary" id="setSave" style="flex:0 0 auto;min-width:90px">保存</button><button class="btnlink" id="setClose">关闭</button></div>
 </div></div>
@@ -738,7 +752,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.19.0';
+var APP_VERSION='0.20.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -751,6 +765,8 @@ var heroFlags={vpip:false,pfr:false,saw:false,sd:false};
 var heroCum={hands:0,vpip:0,pfr:0,saw:0,sd:0,pb:0,pc:0};
 var selectedIds=['champ','prof','whale']; // opponents at table
 var tableTier=0;  // 全桌 AI 难度:0=混合(按角色天然等级) / 1-5=全桌统一等级(v0.19)
+// ---- 天梯 (v0.20):纯荣誉榜,只填昵称,身份=浏览器本地 ID(丢了就重来) ----
+var rp=0, rpHands=0, playerId='', ladderNick='', ladderURL='';
 var rakePct=0,rakeCap=30,showBB=false; // house cut + big-blind display (settings a newbie spec forgets)
 var fourColor=false, lossCap=0, realityMin=30;                 // 无障碍 + 责任博弈设置
 var sessionStart=Date.now(), sessionHands=0, sessionNet=0, sessionRebuys=0, lastReality=Date.now(); // 会话追踪
@@ -783,7 +799,9 @@ function persist(){if(!isPrimary)return;try{localStorage.setItem('vpoker_multi',
   {v:3,pnlHistory:pnlHistory,cumNet:cumNet,heroCum:heroCum,selectedIds:selectedIds,handNo:handNo,
    rakePct:rakePct,rakeCap:rakeCap,showBB:showBB,fourColor:fourColor,lossCap:lossCap,realityMin:realityMin,relayURL:relayURL,
    coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,coachStyle:coachStyle,coachFocus:coachFocus,
-   heroStreak:heroStreak,hudOn:hudOn,tableTier:tableTier,history:handLog.slice(-300)}));}catch(e){}}
+   heroStreak:heroStreak,hudOn:hudOn,tableTier:tableTier,
+   rp:rp,rpHands:rpHands,playerId:playerId,ladderNick:ladderNick,ladderURL:ladderURL,
+   history:handLog.slice(-300)}));}catch(e){}}
 function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi'));
   if(d&&d.v>=2){pnlHistory=d.pnlHistory||[];cumNet=d.cumNet||0;
     heroCum=Object.assign({hands:0,vpip:0,pfr:0,saw:0,sd:0,pb:0,pc:0},d.heroCum||{}); // 逐字段合并，加字段不腐坏
@@ -795,18 +813,20 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
     if(COACH_STYLES[d.coachStyle])coachStyle=d.coachStyle;if(FOCUS_ZH[d.coachFocus])coachFocus=d.coachFocus;
     heroStreak=d.heroStreak||0;hudOn=(d.hudOn!==false);
     if(d.tableTier>=0&&d.tableTier<=5)tableTier=d.tableTier|0;
+    rp=+d.rp||0;rpHands=d.rpHands|0;playerId=d.playerId||'';ladderNick=d.ladderNick||'';ladderURL=d.ladderURL||'';
     if(d.v>=3){handLog=d.history||[];
       // 手号跨会话单调，避免记录 # 重号（红队 L527）
       handNo=Math.max(d.handNo||0, handLog.reduce((m,r)=>Math.max(m,r.id||0),0));}}
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
-  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn;$('setModal').classList.add('open');};
+  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn;$('setLadder').value=ladderURL;$('setModal').classList.add('open');};
 $('setSave').onclick=()=>{rakePct=clamp(parseFloat($('setRakePct').value)||0,0,20);
   rakeCap=Math.max(0,parseInt($('setRakeCap').value)||0);showBB=$('setShowBB').checked;
   fourColor=$('setFourColor').checked;lossCap=Math.max(0,parseInt($('setLossCap').value)||0);
   realityMin=Math.max(0,parseInt($('setRealityMin').value)||0);lastReality=Date.now();
   relayURL=($('setRelay').value||'').trim()||relayURL;hudOn=$('setHud').checked;
+  ladderURL=($('setLadder').value||'').trim().replace(/\/+$/,'');
   $('setModal').classList.remove('open');persist();render();updateStatsPanelAndChart();
   setStatus('设置已保存'+(rakePct>0?'（抽水 '+rakePct+'% · 上限 '+rakeCap+'）':''));};
 $('setClose').onclick=()=>$('setModal').classList.remove('open');
@@ -1037,6 +1057,7 @@ function endHand(){
   if(seats[0].inHand&&!seats[0].folded&&seats[0].revealed)heroCum.sd++;
   var delta=seats[0].stack-heroStackStart;cumNet+=delta;pnlHistory.push(cumNet);
   sessionNet+=delta;sessionHands++;   // 会话追踪（责任博弈）
+  rp+=(delta/BB)*tableMul();rpHands++; // 天梯分:净额(bb)×桌面等级系数——打赢鱼几乎不加分,打赢宗师才值钱
   if(pnlHistory.length>4000)pnlHistory=pnlHistory.slice(-4000);
   // finalize the hand record + run the per-hand coach analysis
   if(handRec){
@@ -1523,6 +1544,11 @@ var AI_TIERS={
  5:{n:'宗师',  b:'L5',d:'范围表 + 盯你的统计漏洞反打你',  iters:300,range:1,  pos:true, tables:true, slack:-0.03,sticky:-0.2,bluffX:0.85,draws:true, exploit:true, tightX:1.2}
 };
 function tierOf(s){return AI_TIERS[s&&s.persona&&s.persona.tier]||AI_TIERS[2];}
+/* ---- 天梯积分 (v0.20):打赢高级 AI 才值钱 ---- */
+var TIER_MUL={1:0.2,2:0.5,3:1.0,4:2.0,5:3.5}; // 赢 L1 的鱼几乎不加分,赢 L5 宗师 ×3.5
+function seatMul(s){return TIER_MUL[(s.persona&&s.persona.tier)||2]||0.5;}
+function tableMul(){var b=seats.filter(function(s){return !s.isHero;});
+  if(!b.length)return 0;var t=0;b.forEach(function(s){t+=seatMul(s);});return t/b.length;}
 // L5 剥削用:统计你面对下注时的弃牌率(只用公开信息——你的动作,不是你的牌)
 var htCache={h:-1,d:null};
 function heroTendency(){
@@ -1635,6 +1661,59 @@ document.querySelectorAll('.quick').forEach(q=>q.onclick=()=>{var c=raiseCtx,pot
   if(q.dataset.f==='allin')v=c.maxTo;else v=seats[0].cStreet+(currentBet-seats[0].cStreet)+Math.round(potNow*+q.dataset.f);
   v=Math.max(c.minTo,Math.min(c.maxTo,v));$('slider').value=v;$('amt').textContent=v;});
 $('btnNext').onclick=startHand;
+
+/* ==================== 天梯 (v0.20) ====================
+ * 诚实榜:分数本地算、显式上传,服务端不校验(Cyrus 定:朋友之间玩靠自觉,开放前再补漏洞)。
+ * 身份:浏览器本地随机 ID + 昵称。清缓存=身份丢失,重来。
+ * 上传是**显式动作**(按钮),绝不自动——昵称+成绩会进公开榜单,该由用户自己按。
+ */
+function ensurePlayerId(){if(!playerId){playerId=randHex(8);persist();}return playerId;}
+function renderLadderMe(){
+  var el=$('ladderMe');if(!el)return;
+  var mul=tableMul();
+  el.innerHTML='<div class="cgrid">'+kpi('天梯分',Math.round(rp))+kpi('计分手数',String(rpHands))+
+    kpi('当前桌系数',mul?'×'+mul.toFixed(2):'—')+kpi('每 100 手',rpHands?((rp/rpHands*100).toFixed(1)):'—')+'</div>';
+  var n=$('ladderNick');if(n&&!n.value)n.value=ladderNick;
+}
+function renderLadderBoard(rows,note){
+  var el=$('ladderBoard');if(!el)return;
+  if(note){el.innerHTML='<div class="cf note">'+escapeHTML(note)+'</div>';return;}
+  if(!rows||!rows.length){el.innerHTML='<div class="sub" style="padding:6px 2px">榜单还空着——你可以是第一个。</div>';return;}
+  var me=playerId;
+  el.innerHTML='<table class="statstab">'+rows.map(function(r,i){
+    var mine=r.id&&r.id===me;
+    return '<tr'+(mine?' style="background:rgba(210,172,94,.12)"':'')+'>'+
+      '<td style="text-align:left;width:34px">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</td>'+
+      '<td style="text-align:left;color:var(--ink)">'+escapeHTML(String(r.nick||'?'))+(mine?' <span class="tierb">你</span>':'')+'</td>'+
+      '<td>'+Math.round(r.rp)+'</td>'+
+      '<td style="color:var(--faint)">'+(r.hands|0)+' 手</td></tr>';}).join('')+'</table>';
+}
+function ladderFetch(){
+  if(!ladderURL){renderLadderBoard(null,'天梯未开通：设置里填「天梯服务地址」后可用（部署见 server/ladder/README）。你的分数仍在本地累计。');return;}
+  renderLadderBoard(null,'加载中…');
+  fetch(ladderURL+'/board?limit=50').then(function(r){return r.json();}).then(function(d){
+    if(d&&d.ok)renderLadderBoard(d.board);else renderLadderBoard(null,'榜单读取失败：'+((d&&d.err)||'未知'));
+  }).catch(function(e){renderLadderBoard(null,'连不上天梯服务（'+String(e.message).slice(0,60)+'）');});
+}
+function ladderSubmit(){
+  var nick=(($('ladderNick')||{}).value||'').trim().slice(0,16);
+  if(!nick){setStatus('先起个昵称再上传。');return;}
+  if(!ladderURL){renderLadderBoard(null,'天梯未开通：设置里填「天梯服务地址」。');return;}
+  if(!rpHands){setStatus('先打几手再上传。');return;}
+  ladderNick=nick;persist();
+  showModal('上传成绩到公开榜单？',
+    '将把 <b>'+escapeHTML(nick)+'</b> · <b>'+Math.round(rp)+' 分</b>（'+rpHands+' 手）提交到<b>公开</b>天梯榜。<br>'+
+    '<span style="color:var(--dim)">这是诚实榜，不做校验；提交后其他人能看到你的昵称和分数。</span>',
+    [{label:'上传',fn:function(){
+      renderLadderBoard(null,'上传中…');
+      fetch(ladderURL+'/submit',{method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({id:ensurePlayerId(),nick:nick,rp:Math.round(rp),hands:rpHands})})
+       .then(function(r){return r.json();}).then(function(d){
+         if(d&&d.ok){renderLadderBoard(d.board);setStatus('已上榜：'+nick+' · '+Math.round(rp)+' 分');}
+         else renderLadderBoard(null,'上传失败：'+((d&&d.err)||'未知'));})
+       .catch(function(e){renderLadderBoard(null,'上传失败（'+String(e.message).slice(0,60)+'）');});
+    }},{label:'算了',fn:function(){}}]);
+}
 
 /* ==================== 新手信息 HUD (v0.17) ==================== */
 // 位置人话:名字 + 一句"为什么"。小白不用背"枪口位"——盘面直接告诉他。
@@ -1942,7 +2021,11 @@ $('btnDiag').onclick=()=>{renderCoach();};
 $('drawerBtn').onclick=openDrawer;$('drawerClose').onclick=closeDrawer;$('drawerBackdrop').onclick=closeDrawer;
 document.querySelectorAll('.dsec').forEach(function(d){d.addEventListener('toggle',function(){
   if(!d.open)return;var tab=d.getAttribute('data-tab');
-  if(tab==='records')renderRecords();else if(tab==='coach')renderCoach();else updateStatsPanelAndChart();});});
+  if(tab==='records')renderRecords();else if(tab==='coach')renderCoach();
+  else if(tab==='ladder'){renderLadderMe();ladderFetch();}
+  else updateStatsPanelAndChart();});});
+$('btnLadderRefresh').onclick=function(){renderLadderMe();ladderFetch();};
+$('btnLadderSubmit').onclick=ladderSubmit;
 // 悬浮教练：拖动 + 最小化 + 关闭 + 顶栏开关
 initCoachDrag();
 window.addEventListener('resize',applyCoachUI); // 窗口变化时把悬浮教练重新夹回牌桌范围内（防拖到边角后缩窗漂出）

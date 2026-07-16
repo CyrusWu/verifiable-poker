@@ -1,0 +1,10 @@
+name = "poker-ladder"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# D1 免费档足够：5M 行读/天、100k 行写/天。
+# database_id 由 `npx wrangler d1 create poker-ladder` 生成后填回这里。
+[[d1_databases]]
+binding = "DB"
+database_name = "poker-ladder"
+database_id = "PASTE_DATABASE_ID_HERE"
