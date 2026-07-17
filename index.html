@@ -280,6 +280,7 @@
     border-bottom:1px solid var(--line);font-family:var(--disp);font-weight:650;font-size:12.5px;
     user-select:none;touch-action:none}
   .coachhead:active{cursor:grabbing}
+  .coachtick{display:none}   /* 字幕条仅手机用(≤760 覆盖为 block) */
   .coachhead .sub{font-weight:400;margin-top:0}
   .chbtn{width:22px;height:22px;line-height:1;padding:0;border-radius:6px;flex:0 0 auto;
     background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:14px}
@@ -586,8 +587,25 @@
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* 页脚收进抽屉(🛡 可验证公平入口),省出一屏 */
     .pagefoot{display:none}
-    /* 悬浮教练:默认停在桌面中上部,别压拇指条 */
-    .coachfloat{bottom:auto;top:96px;right:8px;max-height:46%}
+    /* ☰ 加文字标签(v0.28 真机反馈:光一个 ☰ 认不出是菜单) */
+    .drawerBtn{width:auto;padding:0 13px;font-size:14px;border-color:rgba(210,172,94,.4)}
+    .drawerBtn::after{content:' 菜单';font-size:12.5px;font-family:var(--disp);font-weight:650}
+    /* 教练=字幕条(v0.28 真机反馈:悬浮窗挡牌面):不再浮在毡上,入列在牌桌和操作条之间。
+       默认只占一行(🎙 + 最新一条点评滚动),点条展开成 34vh 聊天卷轴,再点收起。 */
+    .coachfloat{position:static;order:2;width:100%;max-height:none;margin-top:6px;
+      border-left:2px solid var(--verify);border-radius:10px}
+    .tablewrap .table{order:1}
+    .controls{order:3}
+    #replayBar{z-index:10}
+    .coachhead{cursor:pointer;padding:8px 10px}
+    .coachhead .coachttl,.coachhead #coachHeadSub{display:none}   /* 手机字幕条只留 🎙+最新点评 */
+    .coachtick{display:block;flex:1;min-width:0;font-size:11.5px;color:var(--ink);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .coachtick:empty::before{content:'教练在看——你出手后这里滚动点评';color:var(--faint)}
+    .coachfloat .coachchat,.coachfloat .coachcfg,.coachfloat .coachnote{display:none}
+    .coachfloat.exp .coachchat{display:flex;max-height:34vh}
+    .coachfloat.exp .coachnote{display:block}
+    .coachfloat.min{max-height:none}
     /* 复盘条在弹性桌高下略上移 */
     #replayBar{bottom:33%}
   }
@@ -599,7 +617,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.27.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.28.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -686,7 +704,9 @@
           </div>
           <div class="row" id="nextRow" style="display:none">
             <button class="act primary" id="btnNext">开始新一手 ▶</button>
+            <button class="btnlink" id="btnAutoPause" style="display:none;flex:0 0 auto">⏸ 先不开</button>
           </div>
+          <div class="row" id="autoHint" style="display:none;justify-content:center;font-size:11.5px;color:var(--brass)"></div>
         </div>
 
         <!-- 经典复盘条(复盘模式下取代操作区) -->
@@ -703,7 +723,8 @@
 
         <!-- 悬浮教练：半透明，可拖 / 最小化 / 关闭 -->
         <div class="coachfloat" id="coachCol" style="display:none">
-          <div class="coachhead" id="coachDrag">🎙 教练在看 <span class="sub" id="coachHeadSub">实时点评</span>
+          <div class="coachhead" id="coachDrag">🎙 <span class="coachttl">教练在看</span> <span class="sub" id="coachHeadSub">实时点评</span>
+            <span class="coachtick" id="coachTick"></span>
             <button class="chbtn" id="btnCoachCfg" style="margin-left:auto" title="教练设置：风格 / 课题">⚙</button>
             <button class="chbtn" id="btnCoachMin" title="最小化">–</button>
             <button class="chbtn" id="btnCoachClose" title="关闭教练模式">×</button>
@@ -731,7 +752,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.27.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.28.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -795,6 +816,8 @@
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setFourColor" style="width:auto"> 四色牌（♠黑 ♥红 ♦蓝 ♣绿，色盲/无障碍）</label></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setHud" style="width:auto"> 新手提示 HUD（轮到你时显示位置/牌型/胜率，进阶后可关）</label>
     <div class="lockhint" id="setHudHint"></div></div>
+  <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setConfirmBets" style="width:auto"> 大注安全确认（All-in / 超池下注前先确认，防肥手指）</label></div>
+  <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setAutoNext" style="width:auto"> 结束后自动开下一手（大赢的手会自动暂停，留你看牌）</label></div>
   <div class="field"><label>单会话损失上限（0 = 关；到点强制休息）</label><input type="text" id="setLossCap"></div>
   <div class="field"><label>提醒间隔（分钟，0 = 关；到点弹休息提示）</label><input type="text" id="setRealityMin"></div>
   <div class="field"><label>操作模型中继地址（座位选了模型才用；需先跑 server/relay.js）</label><input type="text" id="setRelay"></div>
@@ -976,7 +999,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.27.0';
+var APP_VERSION='0.28.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -999,6 +1022,8 @@ var ladderSyncT=null;                 // 自动同步防抖句柄
 var boardShow=false;                  // 桌上悬浮排行榜:显示/隐藏(v0.24)
 var boardCache=null;                  // 榜单数据缓存 {tier,rows} —— 重画不打网络
 var ladderSaved=null;                 // 进天梯前的 HUD/教练开关,退出时原样还原(v0.25)
+var confirmBets=true;                 // All-in/超池大注先确认(v0.28:可勾"不再提示",设置里可重开)
+var autoNext=true, autoT=null;        // 结束后自动开下一手 + 倒计时句柄(v0.28;大赢的手自动暂停留你看牌)
 var rakePct=0,rakeCap=30,showBB=false; // house cut + big-blind display (settings a newbie spec forgets)
 var fourColor=false, lossCap=0, realityMin=30;                 // 无障碍 + 责任博弈设置
 var sessionStart=Date.now(), sessionHands=0, sessionNet=0, sessionRebuys=0, lastReality=Date.now(); // 会话追踪
@@ -1031,6 +1056,7 @@ function persist(){if(!isPrimary)return;try{localStorage.setItem('vpoker_multi',
   {v:3,pnlHistory:pnlHistory,cumNet:cumNet,heroCum:heroCum,selectedIds:selectedIds,handNo:handNo,
    rakePct:rakePct,rakeCap:rakeCap,showBB:showBB,fourColor:fourColor,lossCap:lossCap,realityMin:realityMin,relayURL:relayURL,
    coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,coachStyle:coachStyle,coachFocus:coachFocus,
+   confirmBets:confirmBets,autoNext:autoNext,
    heroStreak:heroStreak,hudOn:hudOn,tableTier:tableTier,
    playerId:playerId,ladderNick:ladderNick,ladderURL:ladderURL,
    ladderMode:ladderMode,ladderTier:ladderTier,ladderStats:ladderStats,ladderView:ladderView,boardShow:boardShow,
@@ -1045,6 +1071,7 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
     coachMode=!!d.coachMode;coachMin=!!d.coachMin;coachPos=(d.coachPos&&typeof d.coachPos.x==='number')?d.coachPos:null;
     if(COACH_STYLES[d.coachStyle])coachStyle=d.coachStyle;if(FOCUS_ZH[d.coachFocus])coachFocus=d.coachFocus;
     heroStreak=d.heroStreak||0;hudOn=(d.hudOn!==false);
+    confirmBets=(d.confirmBets!==false);autoNext=(d.autoNext!==false);
     if(d.tableTier>=0&&d.tableTier<=5)tableTier=d.tableTier|0;
     playerId=d.playerId||'';ladderNick=d.ladderNick||'';ladderURL=d.ladderURL||'';
     ladderMode=!!d.ladderMode;ladderTier=(d.ladderTier>=1&&d.ladderTier<=5)?d.ladderTier|0:0;
@@ -1063,6 +1090,7 @@ $('rankClose').onclick=function(){$('rankModal').classList.remove('open');};
 $('rankModal').onclick=function(e){if(e.target===$('rankModal'))$('rankModal').classList.remove('open');};
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
   $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn&&!ladderMode;$('setLadder').value=ladderURL;
+  $('setConfirmBets').checked=confirmBets;$('setAutoNext').checked=autoNext;
   // 天梯期间 HUD 开关锁死(比赛不给辅助),并说明原因
   $('setHud').disabled=ladderMode;
   var hh=$('setHudHint');if(hh)hh.textContent=ladderMode?'🏆 天梯模式下已锁：比赛不给辅助。退出天梯后自动还原你原来的设置。':'';
@@ -1074,6 +1102,8 @@ $('setSave').onclick=()=>{rakePct=clamp(parseFloat($('setRakePct').value)||0,0,2
   relayURL=($('setRelay').value||'').trim()||relayURL;
   if(ladderMode){if(ladderSaved)ladderSaved.hudOn=$('setHud').checked;} // 天梯期间改的是"退出后要还原成什么",当下仍锁死
   else hudOn=$('setHud').checked;
+  confirmBets=$('setConfirmBets').checked;autoNext=$('setAutoNext').checked;
+  if(!autoNext)cancelAutoNext();
   ladderURL=($('setLadder').value||'').trim().replace(/\/+$/,'');
   $('setModal').classList.remove('open');persist();render();updateStatsPanelAndChart();
   setStatus('设置已保存'+(rakePct>0?'（抽水 '+rakePct+'% · 上限 '+rakeCap+'）':''));};
@@ -1096,6 +1126,7 @@ function say(si,ev){var s=seats[si];if(!s.persona||!s.persona.talk)return;var ar
 /* ==================== hand lifecycle ==================== */
 function startHand(){
   if(replay)return; // 复盘模式下不发实盘牌(先退出复盘)
+  cancelAutoNext(); // 手动/自动开局都先清倒计时,防双开
   // ---- 责任博弈闸门（在发牌前拦） ----
   if(lossCap>0 && sessionNet<=-lossCap){ showModal('已达本会话损失上限',
     '本会话已亏 <b style="color:var(--loss)">'+(-sessionNet)+'</b>（你设的上限 '+lossCap+'）。<br>强制休息——真要继续，去设置里调，别在上头时改。',
@@ -1347,8 +1378,38 @@ function endHand(){
   }
   $('actRow').querySelectorAll('button').forEach(b=>b.disabled=true);
   $('actRow').style.display='none';$('raiseRow').style.display='none';$('nextRow').style.display='flex';
+  scheduleAutoNext(delta); // v0.28:普通手 4s 自动开下一手;大赢/大输自动暂停留人
 }
 function updateStats(){/* placeholder for future */}
+
+/* ==================== 自动开下一手 (v0.28) ====================
+ * Cyrus 的矛盾:想一局接一局,又想大赢时多看一会儿。解法:
+ * 普通手 → 4 秒倒计时自动发(可点「先不开」暂停);
+ * 大赢手(|净额|≥25BB 或 你摊牌赢到葫芦+) → 自动暂停,写明"值得多看",点按钮才继续。
+ * 责任博弈闸门不受影响:自动到点也是走 startHand,损失上限/休息/破产照拦。 */
+function cancelAutoNext(){if(autoT){clearInterval(autoT);autoT=null;}
+  var b=$('btnNext');if(b)b.textContent='开始新一手 ▶';
+  var p=$('btnAutoPause');if(p)p.style.display='none';
+  var h=$('autoHint');if(h)h.style.display='none';}
+function scheduleAutoNext(delta){
+  cancelAutoNext();
+  if(!autoNext||replay)return;
+  var bigWin=delta>=25*BB||(delta>0&&seats[0].revealed&&lastWinCards.length&&
+    Math.floor(evalBestOf(seats[0].hole.concat(board))/759375)>=6); // 葫芦=6 起
+  var bigLoss=delta<=-25*BB;
+  if(bigWin||bigLoss){ // 值得停:大赢多看两眼,大输喘口气(也给上头降温)
+    var h=$('autoHint');if(h){h.textContent=bigWin?'🏆 这手值得多看两眼——自动发牌已暂停':'😮‍💨 大输一手,歇口气——自动发牌已暂停';h.style.display='flex';}
+    return;}
+  var left=4,b=$('btnNext'),p=$('btnAutoPause');
+  if(p)p.style.display='';
+  if(b)b.textContent='开始新一手 ▶ '+left+'s';
+  autoT=setInterval(function(){
+    if(!handDone||replay||$('genModal').classList.contains('open')){cancelAutoNext();return;} // 有弹窗/复盘/已开局 → 让路
+    left--;
+    if(left<=0){cancelAutoNext();startHand();return;}
+    if(b)b.textContent='开始新一手 ▶ '+left+'s';
+  },1000);
+}
 
 /* ==================== 责任博弈 + 通用弹窗 ==================== */
 function showModal(title,body,btns){
@@ -1493,6 +1554,7 @@ function topLeakTopic(){
 }
 function activeFocus(){return coachFocus==='auto'?(topLeakTopic()||'off'):coachFocus;}
 function coachAppend(tone,msg){var box=$('coachChat');if(!box)return;
+  var tk=$('coachTick');if(tk&&tone!=='mute')tk.textContent=msg; // 手机字幕条:滚动显示最新一条
   var d=document.createElement('div');d.className='cmsg '+tone;
   d.innerHTML='<span class="cav">'+(tone==='result'?'📋':'🎙')+'</span><span>'+escapeHTML(msg)+'</span>';
   box.appendChild(d);box.scrollTop=box.scrollHeight;
@@ -1585,6 +1647,9 @@ function setCoachMode(on){
   persist();}
 // 应用悬浮教练窗的最小化 + 拖动位置(收到牌桌边界内)
 function applyCoachUI(){var c=$('coachCol');if(!c||c.style.display==='none')return;
+  if(window.innerWidth<=760){ // 手机=入列字幕条:清掉拖动留下的内联定位,不然 static 布局被顶飞
+    c.style.left='';c.style.top='';c.style.right='';c.style.bottom='';
+    c.classList.remove('min');return;}
   c.classList.toggle('min',coachMin);
   var mb=$('btnCoachMin');if(mb){mb.textContent=coachMin?'+':'–';mb.title=coachMin?'展开':'最小化';}
   if(coachPos){var wrap=c.parentElement,wr=wrap.getBoundingClientRect();
@@ -1600,7 +1665,14 @@ function toggleCoachMin(){coachMin=!coachMin;
 function initCoachDrag(){
   var head=$('coachDrag'),c=$('coachCol');if(!head||!c)return;
   var dragging=false,ox=0,oy=0;
+  // 手机(≤760):教练是字幕条,点头展开/收起,不拖动
+  head.addEventListener('click',function(e){
+    if(window.innerWidth>760)return;
+    if(e.target.classList.contains('chbtn'))return;
+    c.classList.toggle('exp');
+  });
   head.addEventListener('pointerdown',function(e){
+    if(window.innerWidth<=760)return;                            // 手机不拖(字幕条是入列布局)
     if(e.target.classList.contains('chbtn'))return;             // 点最小化/关闭不触发拖动
     var cr=c.getBoundingClientRect();dragging=true;ox=e.clientX-cr.left;oy=e.clientY-cr.top;
     try{head.setPointerCapture(e.pointerId);}catch(_){}
@@ -1943,15 +2015,20 @@ $('btnConfirm').onclick=()=>{if(handDone||toAct!==0)return;
   var isBet=(currentBet===0),word=isBet?'下注':'加注到';
   // 超池二次确认只对**真正的超池大注**(投入额>底池 且 不是最小合法注)——最小加注被吸附后不该弹"肥手指"警告(外审 A3)
   var overpot=(v-seats[0].cStreet)>potNow && v>raiseCtx.minTo;
-  if(v>=maxTo||overpot){
+  if((v>=maxTo||overpot)&&confirmBets){ // v0.28:可勾"不再提示";设置里可重开
     showModal(v>=maxTo?'确认全下？':'确认超池'+(isBet?'下注':'加注')+'？',
-      (v>=maxTo?'你要投入全部筹码 <b>'+fmt(v)+'</b>。':word+' <b>'+fmt(v)+'</b>，超过当前底池 '+fmt(potNow)+'。')+'这一步不可撤销。',
-      [{label:'确认',fn:function(){applyAction(0,'raise',v);}},{label:'取消',fn:function(){}}]); return; }
+      (v>=maxTo?'你要投入全部筹码 <b>'+fmt(v)+'</b>。':word+' <b>'+fmt(v)+'</b>，超过当前底池 '+fmt(potNow)+'。')+'这一步不可撤销。'+
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;color:var(--dim);cursor:pointer">'+
+      '<input type="checkbox" id="dontAskBet" style="width:auto"> 以后不再提示（设置 → 大注安全确认 可重新打开）</label>',
+      [{label:'确认',fn:function(){
+        var ck=$('dontAskBet');if(ck&&ck.checked){confirmBets=false;persist();setStatus('大注确认已关。设置里可重新打开。');}
+        applyAction(0,'raise',v);}},{label:'取消',fn:function(){}}]); return; }
   applyAction(0,'raise',v);};
 document.querySelectorAll('.quick').forEach(q=>q.onclick=()=>{var c=raiseCtx,potNow=totalPot(),v;
   if(q.dataset.f==='allin')v=c.maxTo;else v=seats[0].cStreet+(currentBet-seats[0].cStreet)+Math.round(potNow*+q.dataset.f);
   setAmt(v);}); // 归一化 + 同步,不再显示吸附前的值
 $('btnNext').onclick=startHand;
+$('btnAutoPause').onclick=function(){cancelAutoNext();setStatus('本手不自动开了。点「开始新一手」继续。');};
 
 /* ==================== 经典手牌复盘 (v0.22) ====================
  * Cyrus 的"神之一手"思路:①还原经典盘面 → ②到关键决策点**先问你怎么打** → ③揭示高手实际打法+为什么。
@@ -2037,7 +2114,7 @@ function replaySetup(h){
 }
 function replayOpen(id){
   var h=CLASSICS.filter(function(c){return c.id===id;})[0];if(!h)return;
-  closeDrawer();
+  cancelAutoNext();closeDrawer();
   replaySaved={showBB:showBB};showBB=false;
   replay={h:h,si:0,ai:0,phase:'intro',asked:0,right:0,verdict:null};
   replaySetup(h);render();replayRenderBar();
@@ -2479,9 +2556,9 @@ function seatEl(si){return $('table').querySelectorAll('.seat')[si];}
 var LAYOUT_M={
  1:[[50,80]], 2:[[50,80],[50,14]], 3:[[50,80],[16,19],[84,19]],
  4:[[50,80],[15,19],[50,13],[85,19]],
- // 5/6 人:对手压到 66px 并排成一行(间距 ≥19.3% 才不重叠)
- 5:[[50,80],[16,15],[38,15],[62,15],[84,15]],
- 6:[[50,80],[11,15],[30.5,15],[50,15],[69.5,15],[89,15]]};
+ // 5/6 人(v0.28 真机反馈:一排太乱):改环形——顶部 2-3 家 + 两侧各 1 家,贴合椭圆桌
+ 5:[[50,80],[12,26],[32,9],[68,9],[88,26]],
+ 6:[[50,80],[10,27],[26,9],[50,7],[74,9],[90,27]]};
 function layoutFor(n){
   if(window.innerWidth>760)return LAYOUT[n]||LAYOUT[6];
   var L=LAYOUT_M[n]||LAYOUT_M[6],tw=($('table')||{}).clientWidth||0;
@@ -2652,7 +2729,7 @@ function openLobby(){
 }
 $('lobbyBtn').onclick=openLobby;
 $('lobbyClose').onclick=()=>$('lobbyModal').classList.remove('open');
-$('lobbyStart').onclick=()=>{$('lobbyModal').classList.remove('open');
+$('lobbyStart').onclick=()=>{cancelAutoNext();$('lobbyModal').classList.remove('open');
   gen++;if(pendingTimer){clearTimeout(pendingTimer);pendingTimer=null;pendingFn=null;} // 作废进行中手的挂起定时器（换桌不留后台 runout）
   turbo=false;preAction=null;prevBoardLen=0;if($('fx'))$('fx').innerHTML='';
   buildSeats();button=0;handDone=true;
