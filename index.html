@@ -380,6 +380,30 @@
   .prebtn.on{color:var(--verify);border-color:var(--verify);background:var(--verify-lo)}
   #preRow,#skipRow{background:rgba(5,12,9,.6);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:11px;padding:6px 10px}
 
+  /* ---- v0.24 天梯标识 + 悬浮排行榜 ---- */
+  .lbadge{display:inline-flex;align-items:center;gap:6px;font-family:var(--disp);font-weight:800;font-size:12.5px;
+    color:var(--brass-ink);background:linear-gradient(180deg,#e7c476,var(--brass));border:1px solid #f0d9a0;
+    border-radius:999px;padding:5px 12px;box-shadow:0 2px 10px rgba(210,172,94,.35);white-space:nowrap}
+  .lbadge .lb-nick{font-weight:600;opacity:.75}
+  .lbadge .lb-live{width:6px;height:6px;border-radius:50%;background:#1d7a3f;animation:lbpulse 1.8s ease-in-out infinite}
+  @keyframes lbpulse{50%{opacity:.25}}
+  .boardfloat{position:absolute;right:14px;top:14px;width:250px;max-height:56%;z-index:7;
+    display:flex;flex-direction:column;overflow:hidden;border-radius:var(--r-md);
+    background:rgba(10,20,16,.86);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-left:2px solid var(--brass);box-shadow:0 12px 32px rgba(0,0,0,.6)}
+  .bfhead{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid var(--line);
+    font-family:var(--disp);font-size:12px;color:var(--dim)}
+  .bfhead b{color:var(--ink)}
+  .bfbody{overflow:auto;padding:4px 6px 7px}
+  .bfrow{display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:11.5px;border-radius:5px}
+  .bfrow.me{background:rgba(210,172,94,.16)}
+  .bfrk{width:22px;flex:0 0 auto;color:var(--faint);font-family:var(--mono);font-size:10.5px}
+  .bfnick{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bfv{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;flex:0 0 auto}
+  .bfnote{font-size:10.5px;color:var(--faint);padding:6px 4px;line-height:1.5}
+  @media(max-width:760px){.boardfloat{width:min(200px,52%);right:8px;top:8px;max-height:44%}
+    .bfrow{font-size:10.5px}.lbadge{font-size:11px;padding:4px 9px}.lbadge .lb-nick{display:none}}
+
   /* ---- v0.22 经典复盘条 ---- */
   /* 高度受限:你有下注时筹码堆把手牌顶上来,缝只剩 ~123px。取舍:决策点(123px)正好塞进缝里零重叠;
      开场/揭示/收尾这些纯阅读相位允许向上盖住公共牌(文字里都写了),但底边锁死在手牌之上——你的牌永不被挡。 */
@@ -478,9 +502,12 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.23.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.24.0</span></h1>
     </div>
     <div class="topctl">
+      <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
+      <span class="lbadge" id="ladderBadge" style="display:none"></span>
+      <button class="btnlink" id="btnBoardToggle" style="font-size:13px;padding:6px 12px;display:none">📊 排行榜</button>
       <button class="btnlink" id="coachBtn" style="font-size:13px;padding:6px 12px">🎙 教练模式</button>
     </div>
   </div>
@@ -566,6 +593,15 @@
         <!-- 经典复盘条(复盘模式下取代操作区) -->
         <div id="replayBar" style="display:none"></div>
 
+        <!-- 天梯排行榜:悬浮在牌桌上,可隐藏/显示 -->
+        <div class="boardfloat" id="boardFloat" style="display:none">
+          <div class="bfhead">📊 <b id="bfTitle">排行榜</b>
+            <button class="chbtn" id="bfRefresh" style="margin-left:auto" title="刷新">↻</button>
+            <button class="chbtn" id="bfClose" title="隐藏排行榜">×</button>
+          </div>
+          <div class="bfbody" id="bfBody"></div>
+        </div>
+
         <!-- 悬浮教练：半透明，可拖 / 最小化 / 关闭 -->
         <div class="coachfloat" id="coachCol" style="display:none">
           <div class="coachhead" id="coachDrag">🎙 教练在看 <span class="sub" id="coachHeadSub">实时点评</span>
@@ -596,7 +632,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.23.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.24.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -832,7 +868,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.23.0';
+var APP_VERSION='0.24.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -852,6 +888,8 @@ var ladderMode=false, ladderTier=0;   // 是否在天梯模式 + 你选的联赛
 var ladderStats={};                   // {档位:{bb:累计大盲净额, hands:手数}} —— 每档独立成绩
 var ladderView=3;                     // 当前正在看的榜
 var ladderSyncT=null;                 // 自动同步防抖句柄
+var boardShow=false;                  // 桌上悬浮排行榜:显示/隐藏(v0.24)
+var boardCache=null;                  // 榜单数据缓存 {tier,rows} —— 重画不打网络
 var rakePct=0,rakeCap=30,showBB=false; // house cut + big-blind display (settings a newbie spec forgets)
 var fourColor=false, lossCap=0, realityMin=30;                 // 无障碍 + 责任博弈设置
 var sessionStart=Date.now(), sessionHands=0, sessionNet=0, sessionRebuys=0, lastReality=Date.now(); // 会话追踪
@@ -886,7 +924,7 @@ function persist(){if(!isPrimary)return;try{localStorage.setItem('vpoker_multi',
    coachMode:coachMode,coachMin:coachMin,coachPos:coachPos,coachStyle:coachStyle,coachFocus:coachFocus,
    heroStreak:heroStreak,hudOn:hudOn,tableTier:tableTier,
    playerId:playerId,ladderNick:ladderNick,ladderURL:ladderURL,
-   ladderMode:ladderMode,ladderTier:ladderTier,ladderStats:ladderStats,ladderView:ladderView,
+   ladderMode:ladderMode,ladderTier:ladderTier,ladderStats:ladderStats,ladderView:ladderView,boardShow:boardShow,
    history:handLog.slice(-300)}));}catch(e){}}
 function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi'));
   if(d&&d.v>=2){pnlHistory=d.pnlHistory||[];cumNet=d.cumNet||0;
@@ -903,6 +941,7 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
     ladderMode=!!d.ladderMode;ladderTier=(d.ladderTier>=1&&d.ladderTier<=5)?d.ladderTier|0:0;
     ladderStats=(d.ladderStats&&typeof d.ladderStats==='object')?d.ladderStats:{};
     if(d.ladderView>=1&&d.ladderView<=5)ladderView=d.ladderView|0;
+    boardShow=!!d.boardShow;
     if(ladderMode&&!ladderTier)ladderMode=false; // 防脏档:模式开着但没档位
     if(d.v>=3){handLog=d.history||[];
       // 手号跨会话单调，避免记录 # 重号（红队 L527）
@@ -1152,7 +1191,7 @@ function endHand(){
   // 天梯计分:只有「天梯模式 + 全桌同档 + 档位与你选的联赛一致」才算,休闲局/混合桌一律不计
   if(ladderMode&&ladderTier&&tierAllSame()===ladderTier){
     var lst=ladderStats[ladderTier]||(ladderStats[ladderTier]={bb:0,hands:0});
-    lst.bb+=delta/BB;lst.hands++;ladderMaybeSync();
+    lst.bb+=delta/BB;lst.hands++;ladderMaybeSync();renderBoardFloat(); // 每手更新悬浮榜里"你"那一行
   }
   if(pnlHistory.length>4000)pnlHistory=pnlHistory.slice(-4000);
   // finalize the hand record + run the per-hand coach analysis
@@ -1957,6 +1996,62 @@ function renderClassics(){
  * 诚实榜:服务端不校验成绩真伪(朋友之间纯荣誉、不涉钱)——已知取舍,UI 与 README 都写明。
  */
 function ensurePlayerId(){if(!playerId){playerId=randHex(8);persist();}return playerId;}
+/* ---- v0.24 天梯标识:一眼看出在打天梯 + 什么级别 ---- */
+function renderLadderBadge(){
+  var b=$('ladderBadge'),t=$('btnBoardToggle');if(!b)return;
+  if(ladderMode&&ladderTier){
+    b.style.display='inline-flex';
+    b.innerHTML='<span class="lb-live"></span>🏆 天梯 · L'+ladderTier+' '+AI_TIERS[ladderTier].n+
+      ' <span class="lb-nick">'+escapeHTML(ladderNick||'')+'</span>';
+    b.title='天梯模式进行中:每手都计入 L'+ladderTier+' 榜并自动同步';
+    t.style.display='';
+  }else{b.style.display='none';t.style.display='none';boardFloatApply(false);}
+}
+/* ---- v0.24 桌上悬浮排行榜(可隐藏/显示) ---- */
+function boardFloatApply(show){
+  var f=$('boardFloat');if(!f)return;
+  f.style.display=show?'flex':'none';
+  var t=$('btnBoardToggle');if(t)t.className='btnlink'+(show?' coachBtn-on':'');
+}
+function toggleBoardFloat(){
+  boardShow=!boardShow;persist();boardFloatApply(boardShow);
+  if(boardShow)boardFloatFetch();
+}
+function boardFloatFetch(){ // 拉当前联赛的榜(悬浮榜永远看自己的联赛)
+  if(!ladderMode||!ladderTier)return;
+  var tier=ladderTier;
+  if(!ladderURL){boardCache={tier:tier,rows:null,note:'天梯未开通(设置里填服务地址)。成绩仍在本地累计。'};renderBoardFloat();return;}
+  boardCache={tier:tier,rows:null,note:'加载中…'};renderBoardFloat();
+  fetch(ladderURL+'/board?tier='+tier+'&limit=50').then(function(r){return r.json();}).then(function(d){
+    boardCache=(d&&d.ok)?{tier:tier,rows:d.board||[]}:{tier:tier,rows:null,note:'读取失败'};
+    renderBoardFloat();
+  }).catch(function(){boardCache={tier:tier,rows:null,note:'连不上天梯服务'};renderBoardFloat();});
+}
+function renderBoardFloat(){
+  var f=$('boardFloat');if(!f||f.style.display==='none')return;
+  var ttl=$('bfTitle'),body=$('bfBody');
+  ttl.textContent='L'+ladderTier+' '+AI_TIERS[ladderTier].n+' 榜';
+  var st=ladderStats[ladderTier]||{bb:0,hands:0},need=Math.max(0,LADDER_MIN_HANDS-(st.hands|0));
+  var mine='<div class="bfnote">你:<b style="color:'+(bb100(st)>=0?'var(--win)':'var(--loss)')+'">'+
+    (bb100(st)>=0?'+':'')+bb100(st).toFixed(1)+'</b> BB/100 · '+(st.hands|0)+' 手'+
+    (need?(' · 还差 <b>'+need+'</b> 手上榜'):' · ✅ 已上榜')+'</div>';
+  if(!boardCache||boardCache.tier!==ladderTier||!boardCache.rows){
+    body.innerHTML=mine+'<div class="bfnote">'+escapeHTML((boardCache&&boardCache.note)||'点 ↻ 刷新')+'</div>';return;}
+  var rows=boardCache.rows;
+  if(!rows.length){body.innerHTML=mine+'<div class="bfnote">这张榜还空着——你可以是第一个。</div>';return;}
+  var meIdx=-1;rows.forEach(function(r,i){if(r.id===playerId)meIdx=i;});
+  var show=rows.slice(0,8);
+  var html=show.map(function(r,i){
+    var v=+r.bb100,me=(r.id===playerId);
+    return '<div class="bfrow'+(me?' me':'')+'"><span class="bfrk">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1))+'</span>'+
+      '<span class="bfnick">'+escapeHTML(String(r.nick||'?'))+'</span>'+
+      '<span class="bfv" style="color:'+(v>=0?'var(--win)':'var(--loss)')+'">'+(v>=0?'+':'')+v.toFixed(1)+'</span></div>';}).join('');
+  if(meIdx>=8){var r=rows[meIdx],v=+r.bb100; // 自己排在 8 名外:单独补一行,别让人找不到自己
+    html+='<div class="bfnote" style="padding:2px 4px">⋯</div><div class="bfrow me"><span class="bfrk">#'+(meIdx+1)+'</span>'+
+      '<span class="bfnick">'+escapeHTML(String(r.nick||'?'))+'</span>'+
+      '<span class="bfv" style="color:'+(v>=0?'var(--win)':'var(--loss)')+'">'+(v>=0?'+':'')+v.toFixed(1)+'</span></div>';}
+  body.innerHTML=html+mine;
+}
 function ladderMaybeSync(){ // 防抖:多手合并成一次上传,别把免费额度打满
   if(!ladderMode||!ladderURL||!ladderNick)return;
   if(ladderSyncT)return;
@@ -1969,7 +2064,10 @@ function ladderPush(cb){
     body:JSON.stringify({id:ensurePlayerId(),nick:ladderNick,tier:ladderTier,
       bb100:+bb100(st).toFixed(2),hands:st.hands})})
    .then(function(r){return r.json();}).then(function(d){if(cb)cb(d);
-     if(d&&d.ok&&ladderView===ladderTier)renderLadderBoard(d.board);})
+     if(d&&d.ok){
+       if(ladderView===ladderTier)renderLadderBoard(d.board);
+       boardCache={tier:ladderTier,rows:d.board||[]};renderBoardFloat(); // 同步成功顺带刷新悬浮榜
+     }})
    .catch(function(){}); // 同步失败不打扰玩家:成绩在本地,下一手再试
 }
 function ladderEnterDialog(){
@@ -1988,7 +2086,11 @@ function ladderEnterDialog(){
       if(!nick){setStatus('得先起个昵称才能进天梯。');return;}
       ladderNick=nick;ladderTier=pick;ladderMode=true;ladderView=pick;
       tableTier=pick;buildSeats();               // 天梯桌:全桌统一成该难度
+      // 桌面:进天梯默认亮出排行榜。手机:默认收起——屏太窄,常驻榜会盖住对手座位(实测挡住 2 家);
+      // 标识已经说明在打天梯,榜改成"点 📊 想看才浮出来"。
+      boardShow=(window.innerWidth>760);
       persist();closeDrawer();render();
+      renderLadderBadge();boardFloatApply(boardShow);if(boardShow)boardFloatFetch();
       setStatus('已进入天梯模式 · L'+pick+' '+AI_TIERS[pick].n+' 联赛 · 昵称 '+nick+'。这局起每手都计入榜单。');
       $('actRow').style.display='none';$('nextRow').style.display='flex';
     }},{label:'取消',fn:function(){}}]);
@@ -2001,7 +2103,7 @@ function ladderExitMode(){
   ladderPush();                       // 退出前把最后成绩推上去
   ladderMode=false;persist();
   setStatus('已退出天梯模式。休闲局不计分。');
-  renderLadderMe();
+  renderLadderMe();renderLadderBadge();  // 标识与悬浮榜一起收掉
 }
 function renderLadderMe(){
   var el=$('ladderMe');if(!el)return;
@@ -2377,6 +2479,12 @@ document.querySelectorAll('.dsec').forEach(function(d){d.addEventListener('toggl
   else if(tab==='classics')renderClassics();
   else updateStatsPanelAndChart();});});
 $('btnLadderRefresh').onclick=function(){renderLadderMe();ladderFetch();};
+// v0.24 天梯标识 + 悬浮排行榜
+$('btnBoardToggle').onclick=toggleBoardFloat;
+$('bfClose').onclick=function(){boardShow=false;persist();boardFloatApply(false);};
+$('bfRefresh').onclick=boardFloatFetch;
+renderLadderBadge();
+if(ladderMode&&boardShow){boardFloatApply(true);boardFloatFetch();}
 // 悬浮教练：拖动 + 最小化 + 关闭 + 顶栏开关
 initCoachDrag();
 // 窗口/转屏变化:把悬浮教练夹回桌内 + 按新宽度重排座位(窄屏两侧要往里收)
