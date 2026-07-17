@@ -380,6 +380,26 @@
   .prebtn.on{color:var(--verify);border-color:var(--verify);background:var(--verify-lo)}
   #preRow,#skipRow{background:rgba(5,12,9,.6);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:11px;padding:6px 10px}
 
+  /* ---- v0.25 天梯竞技场:换桌布,一眼区分「比赛」与「休闲」 ---- */
+  .table.ladder{
+    background:
+      radial-gradient(120% 90% at 50% 40%,#10394e 0%,#082230 62%,#04121a 100%);  /* 冷蓝竞技台,区别于休闲翠绿 */
+    border-color:#2b2416;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,.05),
+      inset 0 0 0 2px rgba(210,172,94,.28),        /* 金色内环:赛事感 */
+      inset 0 0 90px rgba(0,0,0,.6),
+      0 1px 0 #4a3a22,
+      0 24px 60px rgba(0,0,0,.62)}
+  .table.ladder::before{border-color:rgba(210,172,94,.14)}
+  /* 台面水印:天梯竞技场 · L2 常客 —— 印在毡面上,压在牌和座位之下 */
+  .table.ladder::after{content:attr(data-arena);position:absolute;left:50%;top:53%;
+    transform:translate(-50%,-50%);font-family:var(--disp);font-weight:800;
+    font-size:clamp(13px,2.6vw,26px);letter-spacing:.3em;color:rgba(210,172,94,.115);
+    white-space:nowrap;pointer-events:none;z-index:0;text-align:center}
+  @media(max-width:760px){.table.ladder::after{letter-spacing:.18em;font-size:12px}}
+  .lockhint{font-size:10px;color:var(--faint);margin-top:3px;line-height:1.4}
+
   /* ---- v0.24 天梯标识 + 悬浮排行榜 ---- */
   .lbadge{display:inline-flex;align-items:center;gap:6px;font-family:var(--disp);font-weight:800;font-size:12.5px;
     color:var(--brass-ink);background:linear-gradient(180deg,#e7c476,var(--brass));border:1px solid #f0d9a0;
@@ -502,7 +522,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.24.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.25.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -632,7 +652,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.24.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.25.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -694,7 +714,8 @@
   <div class="field"><label>抽水上限（每手封顶）</label><input type="text" id="setRakeCap"></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setShowBB" style="width:auto"> 筹码/底池以大盲(bb)显示</label></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setFourColor" style="width:auto"> 四色牌（♠黑 ♥红 ♦蓝 ♣绿，色盲/无障碍）</label></div>
-  <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setHud" style="width:auto"> 新手提示 HUD（轮到你时显示位置/牌型/胜率，进阶后可关）</label></div>
+  <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setHud" style="width:auto"> 新手提示 HUD（轮到你时显示位置/牌型/胜率，进阶后可关）</label>
+    <div class="lockhint" id="setHudHint"></div></div>
   <div class="field"><label>单会话损失上限（0 = 关；到点强制休息）</label><input type="text" id="setLossCap"></div>
   <div class="field"><label>提醒间隔（分钟，0 = 关；到点弹休息提示）</label><input type="text" id="setRealityMin"></div>
   <div class="field"><label>操作模型中继地址（座位选了模型才用；需先跑 server/relay.js）</label><input type="text" id="setRelay"></div>
@@ -868,7 +889,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.24.0';
+var APP_VERSION='0.25.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -890,6 +911,7 @@ var ladderView=3;                     // 当前正在看的榜
 var ladderSyncT=null;                 // 自动同步防抖句柄
 var boardShow=false;                  // 桌上悬浮排行榜:显示/隐藏(v0.24)
 var boardCache=null;                  // 榜单数据缓存 {tier,rows} —— 重画不打网络
+var ladderSaved=null;                 // 进天梯前的 HUD/教练开关,退出时原样还原(v0.25)
 var rakePct=0,rakeCap=30,showBB=false; // house cut + big-blind display (settings a newbie spec forgets)
 var fourColor=false, lossCap=0, realityMin=30;                 // 无障碍 + 责任博弈设置
 var sessionStart=Date.now(), sessionHands=0, sessionNet=0, sessionRebuys=0, lastReality=Date.now(); // 会话追踪
@@ -949,12 +971,18 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
-  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn;$('setLadder').value=ladderURL;$('setModal').classList.add('open');};
+  $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn&&!ladderMode;$('setLadder').value=ladderURL;
+  // 天梯期间 HUD 开关锁死(比赛不给辅助),并说明原因
+  $('setHud').disabled=ladderMode;
+  var hh=$('setHudHint');if(hh)hh.textContent=ladderMode?'🏆 天梯模式下已锁：比赛不给辅助。退出天梯后自动还原你原来的设置。':'';
+  $('setModal').classList.add('open');};
 $('setSave').onclick=()=>{rakePct=clamp(parseFloat($('setRakePct').value)||0,0,20);
   rakeCap=Math.max(0,parseInt($('setRakeCap').value)||0);showBB=$('setShowBB').checked;
   fourColor=$('setFourColor').checked;lossCap=Math.max(0,parseInt($('setLossCap').value)||0);
   realityMin=Math.max(0,parseInt($('setRealityMin').value)||0);lastReality=Date.now();
-  relayURL=($('setRelay').value||'').trim()||relayURL;hudOn=$('setHud').checked;
+  relayURL=($('setRelay').value||'').trim()||relayURL;
+  if(ladderMode){if(ladderSaved)ladderSaved.hudOn=$('setHud').checked;} // 天梯期间改的是"退出后要还原成什么",当下仍锁死
+  else hudOn=$('setHud').checked;
   ladderURL=($('setLadder').value||'').trim().replace(/\/+$/,'');
   $('setModal').classList.remove('open');persist();render();updateStatsPanelAndChart();
   setStatus('设置已保存'+(rakePct>0?'（抽水 '+rakePct+'% · 上限 '+rakeCap+'）':''));};
@@ -1438,7 +1466,12 @@ function renderCoachCfg(){
   if(sub){var af=activeFocus();
     sub.innerHTML=af==='off'?'实时点评':'<span class="cfocus">课题·'+FOCUS_ZH[af]+(coachFocus==='auto'?'(自动)':'')+'</span>';}
 }
-function setCoachMode(on){coachMode=on;
+function setCoachMode(on){
+  if(on&&ladderMode){ // 天梯是比赛:教练不许开(否则榜量的是"跟提示的执行力",不是你的技术)
+    setStatus('天梯是比赛——教练模式已锁。想开教练,先退出天梯模式(休闲局随便开)。');
+    coachMode=false;$('coachCol').style.display='none';
+    $('coachBtn').className='btnlink';return;}
+  coachMode=on;
   var c=$('coachCol');c.style.display=on?'flex':'none';
   $('coachBtn').className='btnlink'+(on?' coachBtn-on':'');
   if(on){applyCoachUI();renderCoachCfg();if($('coachChat').children.length===0)$('coachChat').innerHTML='<div class="empty">教练在看。你每出一手，这里即时点评好坏 + 为什么。</div>';}
@@ -2005,7 +2038,14 @@ function renderLadderBadge(){
       ' <span class="lb-nick">'+escapeHTML(ladderNick||'')+'</span>';
     b.title='天梯模式进行中:每手都计入 L'+ladderTier+' 榜并自动同步';
     t.style.display='';
-  }else{b.style.display='none';t.style.display='none';boardFloatApply(false);}
+    // 比赛期间辅助轮卸掉:教练按钮置灰 + 说明为什么
+    var cb=$('coachBtn');if(cb){cb.disabled=true;cb.style.opacity='.4';cb.style.cursor='not-allowed';
+      cb.title='天梯是比赛——教练已锁。退出天梯后可用。';}
+  }else{
+    b.style.display='none';t.style.display='none';boardFloatApply(false);
+    var cb2=$('coachBtn');if(cb2){cb2.disabled=false;cb2.style.opacity='';cb2.style.cursor='';
+      cb2.title='';}
+  }
 }
 /* ---- v0.24 桌上悬浮排行榜(可隐藏/显示) ---- */
 function boardFloatApply(show){
@@ -2079,12 +2119,18 @@ function ladderEnterDialog(){
     '<div class="ccrow" style="margin:10px 0"><span class="cck">难度</span><span class="ccbtns" id="ltPick">'+tiers+'</span></div>'+
     '<div class="field"><label>昵称（公开显示，≤16 字）</label>'+
     '<input type="text" id="ltNick" maxlength="16" value="'+escapeHTML(ladderNick)+'" placeholder="给自己起个名"></div>'+
+    '<div class="cf note" style="margin:8px 0"><b>⚔️ 天梯是比赛，辅助轮会卸掉</b>：进入后 <b>新手 HUD 与教练模式自动关闭并锁死</b>——'+
+    '留着的话，榜量的就不是你的技术，是你跟提示的执行力。退出天梯后原样还原。</div>'+
     '<div style="color:var(--dim);font-size:11.5px">榜内口径 = <b>BB/100</b>（每百手赢几个大盲），满 '+LADDER_MIN_HANDS+' 手才上榜。'+
-    '随时可退出。天梯桌会把全桌 AI 统一成你选的难度。</div></div>',
+    '随时可退出。天梯桌会把全桌 AI 统一成你选的难度，桌布也会换成竞技场。</div></div>',
     [{label:'开打 ▶',fn:function(){
       var nick=(($('ltNick')||{}).value||'').trim().slice(0,16);
       if(!nick){setStatus('得先起个昵称才能进天梯。');return;}
       ladderNick=nick;ladderTier=pick;ladderMode=true;ladderView=pick;
+      // 天梯 = 比赛:卸掉辅助轮。HUD 告诉你位置/牌型/胜率、教练告诉你对错——留着的话,
+      // 榜量的就不是你的技术,是你跟提示的执行力。存下原设置,退出时还原。
+      ladderSaved={hudOn:hudOn,coachMode:coachMode};
+      hudOn=false;if(coachMode)setCoachMode(false);
       tableTier=pick;buildSeats();               // 天梯桌:全桌统一成该难度
       // 桌面:进天梯默认亮出排行榜。手机:默认收起——屏太窄,常驻榜会盖住对手座位(实测挡住 2 家);
       // 标识已经说明在打天梯,榜改成"点 📊 想看才浮出来"。
@@ -2101,9 +2147,15 @@ function ladderEnterDialog(){
 }
 function ladderExitMode(){
   ladderPush();                       // 退出前把最后成绩推上去
-  ladderMode=false;persist();
-  setStatus('已退出天梯模式。休闲局不计分。');
-  renderLadderMe();renderLadderBadge();  // 标识与悬浮榜一起收掉
+  ladderMode=false;
+  if(ladderSaved){                    // 还原进天梯前的 HUD/教练开关
+    hudOn=ladderSaved.hudOn;
+    if(ladderSaved.coachMode)setCoachMode(true);
+    ladderSaved=null;
+  }
+  persist();
+  setStatus('已退出天梯模式。休闲局不计分,HUD 与教练已还原。');
+  renderLadderMe();renderLadderBadge();render();  // 标识/悬浮榜收掉 + 桌布还原成休闲绿
 }
 function renderLadderMe(){
   var el=$('ladderMe');if(!el)return;
@@ -2111,7 +2163,8 @@ function renderLadderMe(){
   if(ladderMode){
     var need=Math.max(0,LADDER_MIN_HANDS-st.hands);
     el.innerHTML='<div class="cf ok" style="margin-bottom:8px">🏆 天梯模式进行中 · <b>L'+ladderTier+' '+AI_TIERS[ladderTier].n+
-      '</b> 联赛 · 昵称 <b>'+escapeHTML(ladderNick)+'</b></div>'+
+      '</b> 联赛 · 昵称 <b>'+escapeHTML(ladderNick)+'</b><br>'+
+      '<span style="color:var(--faint);font-size:11px">⚔️ 比赛中：HUD 与教练已锁，退出后还原。</span></div>'+
       '<div class="cgrid">'+kpi('BB/100',bb100(st).toFixed(1))+kpi('已打手数',String(st.hands|0))+
       kpi('上榜门槛',need?('还差 '+need+' 手'):'✅ 已达标')+kpi('累计大盲',(st.bb>=0?'+':'')+st.bb.toFixed(1))+'</div>'+
       '<div class="btnrow" style="margin-top:8px"><button class="btnlink" id="btnLadderExit">退出天梯模式</button></div>';
@@ -2178,6 +2231,7 @@ function handDesc(hole,board){
 var hudCache={key:'',data:null};
 function heroHUD(){
   var s=seats[0];
+  if(ladderMode)return null; // 天梯是比赛:HUD 一律不给(纵深防御,不依赖 hudOn 被谁改过)
   if(!hudOn||handDone||toAct!==0||!s.inHand||s.folded||s.allIn)return null;
   var key=handNo+'|'+street+'|'+currentBet+'|'+board.length+'|'+s.cStreet;
   if(hudCache.key===key)return hudCache.data;
@@ -2280,7 +2334,9 @@ function cardEl(c,opts){opts=opts||{};if(c==='back')return '<div class="cd back'
     rankStr(c.r)+'</div><div class="s">'+SUIT[c.s]+'</div></div>';}
 function render(){
   var t=$('table'),n=seats.length,L=layoutFor(n);
-  t.className='table t'+n; // 人数类:手机上 5/6 人桌要额外压缩座位(塞不下)
+  // 人数类:手机上 5/6 人桌要额外压缩座位(塞不下)。天梯类:换成竞技场桌布 + 台面水印
+  t.className='table t'+n+((ladderMode&&ladderTier)?' ladder':'');
+  t.setAttribute('data-arena',(ladderMode&&ladderTier)?('天梯竞技场 · L'+ladderTier+' '+AI_TIERS[ladderTier].n):'');
   var winCards=lastWinCards;
   var html='';
   // pot + board
