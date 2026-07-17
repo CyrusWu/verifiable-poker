@@ -266,6 +266,7 @@
     border:1px solid var(--line);box-shadow:0 14px 36px rgba(0,0,0,.6)}
   .coachfloat.min{max-height:none}
   .coachfloat.min .coachchat{display:none}
+  .coachfloat.min .coachcfg{display:none}   /* 外审 A4:最小化要连设置区一起收,否则手机上仍留 ~130px 面板 */
   .coachhead{display:flex;align-items:center;gap:7px;padding:8px 10px;cursor:grab;
     border-bottom:1px solid var(--line);font-family:var(--disp);font-weight:650;font-size:12.5px;
     user-select:none;touch-action:none}
@@ -283,6 +284,17 @@
   .cmsg.bad{border-left-color:var(--loss);background:rgba(255,107,107,.12);color:#ffd9d9}
   .cmsg.warn{border-left-color:var(--brass);background:rgba(210,172,94,.13)}
   .cmsg.result{border-left-color:var(--verify);background:var(--verify-lo);font-weight:600}
+  .cmsg.mute{border-left-color:var(--line2);background:transparent;color:var(--faint);font-size:11px}
+  /* 牌型速查 */
+  .hud-seg.hand{cursor:pointer;border-radius:6px}
+  .hud-seg.hand:hover{background:rgba(255,255,255,.05)}
+  .rankrow{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;font-size:13px}
+  .rankrow+.rankrow{border-top:1px solid var(--line)}
+  .rankrow.on{background:rgba(210,172,94,.14);border-top-color:transparent}
+  .rankn{width:20px;flex:0 0 auto;font-family:var(--mono);color:var(--faint);font-size:11px;text-align:center}
+  .rankname{flex:0 0 auto;width:96px;font-family:var(--disp);font-weight:650;color:var(--ink)}
+  .ranke{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  @media(max-width:640px){.rankname{width:72px;font-size:12px}.ranke{font-size:10.5px}}
   /* 每手分隔符（第几手 + 底牌） */
   .cdiv{display:flex;align-items:center;gap:8px;margin:9px 2px 3px;color:var(--dim);font-size:11px;
     font-family:var(--disp);font-weight:600;white-space:nowrap}
@@ -460,7 +472,9 @@
   .hudtoggle{margin-left:auto;align-self:center;width:20px;height:20px;line-height:1;padding:0;border-radius:6px;
     background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--faint);cursor:pointer;font-size:11px}
   .hudtoggle:hover{color:var(--ink)}
-  @media(max-width:640px){.hud-sub{display:none}.hud-seg{padding:0 8px}}
+  /* v0.26 外审 B2:窄屏只收起「位置」的解释副标题,决策段(该不该跟/门槛/结论)必须留——那是决策依据本身 */
+  @media(max-width:640px){.hud-seg.pos .hud-sub,.hud-seg.hand .hud-sub{display:none}.hud-seg{padding:0 7px}
+    .hud-seg.eq .hud-v{font-size:11.5px}.hud-seg.eq .hud-sub{font-size:9px}}
 
   /* ---- v0.21 移动端:窄屏真机适配(朋友大概率手机点开) ---- */
   @media(max-width:760px){
@@ -522,7 +536,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.25.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.26.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -541,8 +555,9 @@
         <div class="drawer" id="drawer">
           <div class="drawerHead">☰ 菜单<button class="chbtn" id="drawerClose" style="margin-left:auto">×</button></div>
           <div class="drawerList">
+            <button class="draweritem" id="rankBtn">🃏 牌型大小 · 怎么决定输赢</button>
             <button class="draweritem" id="lobbyBtn">🪑 牌桌设置 · 选谁陪你玩</button>
-            <button class="draweritem" id="settingsBtn">⚙️ 规则 / 责任设置</button>
+            <button class="draweritem" id="settingsBtn">⚙️ 桌面与责任设置</button>
             <details class="dsec" data-tab="records"><summary>🗂 牌局记录</summary><div class="dbody">
               <div style="text-align:right;margin-bottom:6px"><button class="btnlink" id="btnChain">🔗 验证手历完整性</button></div>
               <div id="records"></div>
@@ -652,7 +667,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.25.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.26.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -709,7 +724,7 @@
 
 <!-- settings modal -->
 <div class="modal" id="setModal"><div class="sheet">
-  <h2>⚙️ 桌面设置</h2>
+  <h2>⚙️ 桌面与责任设置</h2>
   <div class="field"><label>抽水 rake（%，庄家从每个见翻牌的底池抽走；默认 0）</label><input type="text" id="setRakePct"></div>
   <div class="field"><label>抽水上限（每手封顶）</label><input type="text" id="setRakeCap"></div>
   <div class="field"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="setShowBB" style="width:auto"> 筹码/底池以大盲(bb)显示</label></div>
@@ -736,6 +751,14 @@
   <h2>🔍 上一手 · 可验证性检查</h2>
   <div id="vBody"></div>
   <div class="btnrow"><button class="btnlink" id="vClose">关闭</button></div>
+</div></div>
+
+<!-- 牌型速查(新手 0→1 地基:连一对两对谁大都不知道的人) -->
+<div class="modal" id="rankModal"><div class="sheet" style="max-width:440px">
+  <h2>🃏 牌型大小 · 怎么决定输赢</h2>
+  <div class="note" style="margin-top:0">用你手里的 <b>2 张牌</b> + 桌上 <b>5 张公共牌</b>，任意凑出<b>最强的 5 张</b>。谁的 5 张更大，谁赢。</div>
+  <div id="rankList" style="margin-top:12px"></div>
+  <div class="btnrow"><button class="btnlink" id="rankClose">知道了</button></div>
 </div></div>
 
 <script>
@@ -889,7 +912,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.25.0';
+var APP_VERSION='0.26.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -970,6 +993,9 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
       handNo=Math.max(d.handNo||0, handLog.reduce((m,r)=>Math.max(m,r.id||0),0));}}
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
+$('rankBtn').onclick=function(){closeDrawer();showHandRank();};
+$('rankClose').onclick=function(){$('rankModal').classList.remove('open');};
+$('rankModal').onclick=function(e){if(e.target===$('rankModal'))$('rankModal').classList.remove('open');};
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
   $('setFourColor').checked=fourColor;$('setLossCap').value=lossCap;$('setRealityMin').value=realityMin;$('setRelay').value=relayURL;$('setHud').checked=hudOn&&!ladderMode;$('setLadder').value=ladderURL;
   // 天梯期间 HUD 开关锁死(比赛不给辅助),并说明原因
@@ -1084,7 +1110,9 @@ function applyAction(si,type,amt){
       outs:(street==='flop'||street==='turn')?countOuts(s.hole,board):null,
       oppBehind:_lo.length?Math.max.apply(null,_lo.map(function(o){return o.stack;})):0, // 隐含赔率:还能从对手赢多少
       heroStack:s.stack,
-      eqv:equity(s.hole,board,board.length===0?220:150,_tg,Math.max(1,_no)),potOdds:_call>0?_call/(_pb+_call):0};}
+      bt:(currentBet===0?'下注':'加注'),  // v0.26:无人下注=下注,面对下注抬高=加注。别把 bet 教成 raise(GPT 外审 A2)
+      // v0.26:胜率只算一次,HUD 与教练共用同一份快照(外审 A1:两处各跑一次蒙特卡洛 → 30% vs 25% 自相矛盾)
+      eqv:decisionSnapshot().eqv,err:decisionSnapshot().err,potOdds:_call>0?_call/(_pb+_call):0};}
   if(type==='fold'){s.folded=true;s.lastAction='弃牌';say(si,'fold');}
   else if(type==='check'){s.acted=true;s.lastAction='过牌';}
   else if(type==='call'){
@@ -1405,7 +1433,7 @@ function coachAppend(tone,msg){var box=$('coachChat');if(!box)return;
   box.appendChild(d);box.scrollTop=box.scrollHeight;
   while(box.children.length>60)box.removeChild(box.firstChild);}
 // 每手第一条点评前插一条分隔符（第几手 + 你的底牌），让往前翻能认出是哪一手
-var coachLastHand=0;
+var coachLastHand=0, coachSkipHand=0;
 function coachHandDivider(hole){var box=$('coachChat');if(!box)return;
   var emp=box.querySelector('.empty');if(emp)emp.remove();
   var d=document.createElement('div');d.className='cdiv';
@@ -1426,23 +1454,37 @@ function coachComment(ctx){
     else if(ctx.eqv>ctx.potOdds+0.15){tone='good';
       msg=st+' 跟得对，胜率 '+eq+'% 远超所需 '+od+'%'+(dtx?'（'+dtx+'）':'')+
         (ctx.eqv>=0.6?'，甚至能考虑加注要价值。':(dtx&&ctx.st!=='river'&&ctx.outs.strong>=8?'，也可考虑半诈唬加注。':'。'));}
-    else{tone='ok';msg=st+' 跟 '+ctx.toCall+' 合理，'+eq+'% vs 需 '+od+'%'+(dtx?'（'+dtx+'）':'')+'，临界偏正。';}
+    else{ // 临界区([门槛-4pp, 门槛+15pp]):外审 A1——绝不再把负差说成"偏正"。按估算误差诚实分三档。
+      var mg=Math.max(3,Math.round((ctx.err||0.03)*200)); // 2 个标准误(pp),约 95% 区间半宽
+      var diff=Math.round((ctx.eqv-ctx.potOdds)*100);
+      if(diff< -mg){tone='warn';msg=st+' 跟 '+ctx.toCall+'：'+eq+'% 略低于门槛 '+od+'%（差 '+(-diff)+'pp）→ 边缘偏负'+(dtx?'，'+dtx+'撑一点':'')+'。长期小亏，别养成习惯。';}
+      else if(diff> mg){tone='ok';msg=st+' 跟 '+ctx.toCall+'：'+eq+'% 略高于门槛 '+od+'% → 边缘偏正，跟得过。';}
+      else{tone='ok';msg=st+' 跟 '+ctx.toCall+'：'+eq+'% ≈ 门槛 '+od+'%（估算 ±'+mg+'pp，说不准）→ 真临界，跟弃都不算错。';}}
   }else if(ctx.act==='fold'&&ctx.toCall>0){
     if(ctx.eqv>ctx.potOdds+0.16){tone='bad';msg=st+' 这个弃牌亏了：你有约 '+eq+'% 胜率，只需 '+od+'% 就该跟——过度弃牌。';}
     else if(impliedOK(ctx)){tone='warn';msg=st+' 弃了 '+drawTxt(ctx)+'：直接赔率确实不够，但后手深，隐含赔率下这个弃偏紧。';}
     else{tone='good';msg=st+' 好弃，'+eq+'% 不够 '+od+'% 的价。';}
   }else if(ctx.act==='raise'){
-    if(ctx.eqv>0.6){tone='good';msg=st+' 加注要价值（'+eq+'%），打得好。';}
-    else if(ctx.outs&&ctx.outs.strong>=8&&ctx.st!=='river'&&drawTxt(ctx)){tone='good';msg=st+' 半诈唬加注（'+drawTxt(ctx)+'）：弃牌权益+听牌兜底，两条路赢，标准打法。';}
-    else if(ctx.eqv<0.35){tone='warn';msg=st+' 低胜率（'+eq+'%）加注=诈唬，别 spew，得有弃牌权益才值。';}
-    else{tone='ok';msg=st+' 加注（'+eq+'%），中等强度施压。';}
-  }else return; // 过牌不评
+    var B=ctx.bt||'加注';  // 外审 A2:无人下注=下注,面对下注抬高=加注。别把 bet 教成 raise
+    if(ctx.eqv>0.6){tone='good';msg=st+' '+B+'要价值（'+eq+'%），打得好。';}
+    else if(ctx.outs&&ctx.outs.strong>=8&&ctx.st!=='river'&&drawTxt(ctx)){tone='good';msg=st+' 半诈唬'+B+'（'+drawTxt(ctx)+'）：弃牌权益+听牌兜底，两条路赢，标准打法。';}
+    else if(ctx.eqv<0.35){tone='warn';msg=st+' 低胜率（'+eq+'%）'+B+'=诈唬，别 spew，得有弃牌权益才值。';}
+    else{tone='ok';msg=st+' '+B+'（'+eq+'%），中等强度施压。';}
+  }else if(ctx.act==='check'){ // 外审 B3:过牌也要回一句(主张是"每次出手告诉你对不对",不能静默)
+    if(ctx.eqv>=0.62&&ctx.st!=='preflop'){tone='warn';msg=st+' 过牌漏了价值：'+eq+'% 是强牌，这里该下注要钱，白送对手免费看牌。';}
+    else if(ctx.eqv>=0.62){tone='warn';msg=st+' '+eq+'% 的强起手只过牌：翻前该加注建池、拿主动权。';}
+    else{tone='good';msg=st+' 过牌合理：'+eq+'% 牌力一般，不扩大底池，免费看下一张。';}
+  }else return;
   // SPR 承诺提示:翻牌低 SPR + 有真实资产 → 计划打到底,别半途丢
   if(ctx.st==='flop'&&ctx.spr!=null&&ctx.spr<=3&&ctx.eqv>=0.45&&(ctx.act==='call'||ctx.act==='raise'))
     msg+=' SPR '+ctx.spr+'：底池已承诺，计划打到底。';
-  // 课程化:定了课题就只讲这个课题(减噪 > 全报)
+  // 课程化:定了课题就只讲这个课题(减噪 > 全报)。外审 B3:过滤时不静默,给一条灰字说明为什么,每手最多一条防刷屏
   var af=activeFocus();
-  if(af!=='off'&&topicOf(ctx,!!pj)!==af)return;
+  if(af!=='off'&&topicOf(ctx,!!pj)!==af){
+    if(handNo!==coachSkipHand){coachSkipHand=handNo;
+      if(handNo!==coachLastHand){coachHandDivider(ctx.hole);coachLastHand=handNo;}
+      coachAppend('mute','（本手动作不属于当前课题「'+FOCUS_ZH[af]+'」，未点评。想看全部：教练 ⚙ → 课题 → 全部）');}
+    return;}
   if(handNo!==coachLastHand){coachHandDivider(ctx.hole);coachLastHand=handNo;} // 新的一手 → 先插分隔符
   coachAppend(tone,styleMsg(tone,msg));
 }
@@ -1487,7 +1529,9 @@ function applyCoachUI(){var c=$('coachCol');if(!c||c.style.display==='none')retu
 /* ==================== 左上抽屉 + 悬浮教练拖动 ==================== */
 function openDrawer(){$('drawer').classList.add('open');$('drawerBackdrop').classList.add('open');}
 function closeDrawer(){$('drawer').classList.remove('open');$('drawerBackdrop').classList.remove('open');}
-function toggleCoachMin(){coachMin=!coachMin;applyCoachUI();persist();}
+function toggleCoachMin(){coachMin=!coachMin;
+  if(coachMin){var c=$('coachCfg');if(c)c.style.display='none';} // 外审 A4:最小化时也把展开的设置区收掉
+  applyCoachUI();persist();}
 function initCoachDrag(){
   var head=$('coachDrag'),c=$('coachCol');if(!head||!c)return;
   var dragging=false,ox=0,oy=0;
@@ -1816,9 +1860,14 @@ function enableHero(){
   raiseCtx={minTo:Math.min(minTo,maxTo),maxTo:maxTo};
 }
 function disableHero(){$('actRow').querySelectorAll('button').forEach(b=>b.disabled=true);$('raiseRow').style.display='none';}
+// v0.26 外审 A3:快捷键算出 43 → 浏览器把滑杆吸附到 40(步长)→ 文字却还写 43,确认执行 40。
+// 修法:所有写值都过 setAmt——先按滑杆真实落点(min + round((v-min)/step)*step)归一化,再同步滑杆和文字,返回真值。
+function setAmt(v){var s=$('slider'),mn=+s.min,mx=+s.max,step=+s.step||1;
+  v=Math.max(mn,Math.min(mx,v));
+  var snapped=Math.min(mx,mn+Math.round((v-mn)/step)*step);
+  s.value=snapped;$('amt').textContent=s.value;return +s.value;}
 function openRaise(){var c=raiseCtx,s=$('slider');s.min=c.minTo;s.max=c.maxTo;s.step=BB/2;
-  var potNow=totalPot(),def=Math.min(c.maxTo,Math.max(c.minTo,seats[0].cStreet+Math.round(potNow*0.66)));
-  s.value=def;$('amt').textContent=def;$('raiseRow').style.display='flex';}
+  var potNow=totalPot();setAmt(seats[0].cStreet+Math.round(potNow*0.66));$('raiseRow').style.display='flex';}
 // hero handlers guard on (handDone||toAct!==0) → idempotent, blocks double-submit & out-of-turn clicks
 $('btnFold').onclick=()=>{if(handDone||toAct!==0)return;applyAction(0,'fold');};
 $('btnCheck').onclick=()=>{if(handDone||toAct!==0)return;applyAction(0,(currentBet-seats[0].cStreet)===0?'check':'call');};
@@ -1826,14 +1875,17 @@ $('btnRaise').onclick=openRaise;
 $('slider').oninput=e=>$('amt').textContent=e.target.value;
 $('btnConfirm').onclick=()=>{if(handDone||toAct!==0)return;
   var v=+$('slider').value,maxTo=seats[0].cStreet+seats[0].stack,potNow=totalPot();
-  if(v>=maxTo||(v-seats[0].cStreet)>potNow){ // all-in 或超池 → 二次确认（防肥手指梭哈）
-    showModal(v>=maxTo?'确认全下？':'确认超池下注？',
-      (v>=maxTo?'你要投入全部筹码 <b>'+fmt(v)+'</b>。':'下注 <b>'+fmt(v)+'</b>，超过当前底池 '+fmt(potNow)+'。')+'这一步不可撤销。',
+  var isBet=(currentBet===0),word=isBet?'下注':'加注到';
+  // 超池二次确认只对**真正的超池大注**(投入额>底池 且 不是最小合法注)——最小加注被吸附后不该弹"肥手指"警告(外审 A3)
+  var overpot=(v-seats[0].cStreet)>potNow && v>raiseCtx.minTo;
+  if(v>=maxTo||overpot){
+    showModal(v>=maxTo?'确认全下？':'确认超池'+(isBet?'下注':'加注')+'？',
+      (v>=maxTo?'你要投入全部筹码 <b>'+fmt(v)+'</b>。':word+' <b>'+fmt(v)+'</b>，超过当前底池 '+fmt(potNow)+'。')+'这一步不可撤销。',
       [{label:'确认',fn:function(){applyAction(0,'raise',v);}},{label:'取消',fn:function(){}}]); return; }
   applyAction(0,'raise',v);};
 document.querySelectorAll('.quick').forEach(q=>q.onclick=()=>{var c=raiseCtx,potNow=totalPot(),v;
   if(q.dataset.f==='allin')v=c.maxTo;else v=seats[0].cStreet+(currentBet-seats[0].cStreet)+Math.round(potNow*+q.dataset.f);
-  v=Math.max(c.minTo,Math.min(c.maxTo,v));$('slider').value=v;$('amt').textContent=v;});
+  setAmt(v);}); // 归一化 + 同步,不再显示吸附前的值
 $('btnNext').onclick=startHand;
 
 /* ==================== 经典手牌复盘 (v0.22) ====================
@@ -2228,33 +2280,82 @@ function handDesc(hole,board){
   if(nm==='一对')nm=pairLabel(hole,board);
   return nm+ex;
 }
-var hudCache={key:'',data:null};
+/* ==================== 决策快照 (v0.26) ====================
+ * 外审 A1:HUD 和教练**各跑一次蒙特卡洛**,同一个决策出两个数(30% vs 25%),教练据此还说反话。
+ * 修法:一次决策只算一次胜率,两边共用。key 覆盖所有会改变局面的量,局面不变就不重算。
+ * 同时给出蒙特卡洛的标准误 err —— 150 次采样在 p≈0.3 时 SE≈3.7pp,**这个不确定性必须说出来,
+ * 不能把 25% 伪装成精确值再去和 29% 比大小**。
+ */
+var decCache={key:'',data:null};
+function decisionSnapshot(){
+  var s=seats[0];
+  var key=handNo+'|'+street+'|'+currentBet+'|'+board.length+'|'+s.cStreet+'|'+contenders().length;
+  if(decCache.key===key)return decCache.data;
+  var nOpp=contenders().length-1,potNow=totalPot(),toCall=currentBet-s.cStreet;
+  var tight=clamp(aggressionTightness(toCall,potNow)+0.06*Math.max(0,nOpp-1),.08,.9);
+  var iters=board.length===0?220:150;
+  var eqv=equity(s.hole,board,iters,tight,Math.max(1,nOpp));
+  var cc=Math.min(toCall,s.stack);
+  decCache={key:key,data:{
+    eqv:eqv, err:Math.sqrt(Math.max(0.0001,eqv*(1-eqv))/iters), // 1 个标准误
+    potOdds:cc>0?cc/(potNow+cc):0, toCall:cc, nOpp:nOpp, potBefore:potNow, iters:iters}};
+  return decCache.data;
+}
 function heroHUD(){
   var s=seats[0];
   if(ladderMode)return null; // 天梯是比赛:HUD 一律不给(纵深防御,不依赖 hudOn 被谁改过)
   if(!hudOn||handDone||toAct!==0||!s.inHand||s.folded||s.allIn)return null;
-  var key=handNo+'|'+street+'|'+currentBet+'|'+board.length+'|'+s.cStreet;
-  if(hudCache.key===key)return hudCache.data;
-  var nOpp=contenders().length-1,potNow=totalPot(),toCall=currentBet-s.cStreet;
-  var tight=clamp(aggressionTightness(toCall,potNow)+0.06*Math.max(0,nOpp-1),.08,.9);
-  var eqv=equity(s.hole,board,board.length===0?220:150,tight,Math.max(1,nOpp));
-  var cc=Math.min(toCall,s.stack),potOdds=cc>0?cc/(potNow+cc):0;
-  hudCache={key:key,data:{pos:posName(0),nOpp:nOpp,eqv:eqv,toCall:cc,potOdds:potOdds,hand:handDesc(s.hole,board)}};
-  return hudCache.data;
+  var d=decisionSnapshot();  // 与教练同源,绝不各算各的
+  return {pos:posName(0),nOpp:d.nOpp,eqv:d.eqv,err:d.err,toCall:d.toCall,potOdds:d.potOdds,
+    hand:handDesc(s.hole,board)};
+}
+// B1 牌型速查:0→1 地基。当前手若已成手,把你现在是什么牌型高亮出来。
+var RANKREF=[
+  {n:'同花顺',e:'A♠ K♠ Q♠ J♠ 10♠',d:'同花色 + 连续'},
+  {n:'四条',  e:'K♦ K♠ K♥ K♣ 3',   d:'四张同点'},
+  {n:'葫芦',  e:'Q Q Q + 8 8',       d:'三条 + 一对'},
+  {n:'同花',  e:'A♥ J♥ 8♥ 5♥ 2♥',  d:'五张同花色'},
+  {n:'顺子',  e:'9 8 7 6 5',         d:'五张连续（花色不限）'},
+  {n:'三条',  e:'7 7 7 + K 4',       d:'三张同点'},
+  {n:'两对',  e:'J J + 4 4 + 9',     d:'两个对子'},
+  {n:'一对',  e:'A A + K 7 3',       d:'两张同点'},
+  {n:'高牌',  e:'A K 9 5 2',         d:'啥都没凑成，比最大单张'}];
+function showHandRank(){
+  var cur='';
+  if(!handDone&&seats[0]&&seats[0].inHand&&!seats[0].folded&&board.length>=3)
+    cur=CATN[Math.floor(evalBestOf(seats[0].hole.concat(board))/759375)];
+  $('rankList').innerHTML=RANKREF.map(function(r,i){var on=(r.n===cur);
+    return '<div class="rankrow'+(on?' on':'')+'"><span class="rankn">'+(9-i)+'</span>'+
+      '<span class="rankname">'+r.n+(on?' <b style="color:var(--brass)">← 你现在是这个</b>':'')+'</span>'+
+      '<span class="ranke">'+r.e+'</span></div>';}).join('');
+  $('rankModal').classList.add('open');
 }
 function renderHUD(){
   var row=$('hudRow');if(!row)return;
   var d=heroHUD();
   if(!d){row.style.display='none';return;}
-  var p=POSZH[d.pos]||[d.pos,''],eq=Math.round(d.eqv*100);
-  var ecls=eq>=55?'eqhi':eq>=35?'eqmid':'eqlo';
-  var eqSub=d.toCall>0?('跟需 '+Math.round(d.potOdds*100)+'%'):('vs '+d.nOpp+' 家');
+  var p=POSZH[d.pos]||[d.pos,''],eq=Math.round(d.eqv*100),th=Math.round(d.potOdds*100);
+  var mg=Math.round((d.err||0.03)*100);   // 蒙特卡洛标准误(pp)
+  // v0.26 外审 B2:别丢两个裸百分比让人自己比大小 —— 直接给**关系**和结论。
+  // 且这一段的副标题在手机上不许隐藏(它就是决策依据本身)。
+  var eqK,eqV,eqSub,ecls;
+  if(d.toCall>0){
+    var diff=eq-th;
+    ecls=(diff> mg)?'eqhi':(diff< -mg)?'eqlo':'eqmid';
+    eqK='该不该跟';
+    eqV=eq+'% '+(diff>mg?'>':diff<-mg?'<':'≈')+' 门槛 '+th+'%';
+    eqSub=(diff> mg)?'价格够，可以跟':(diff< -mg)?'价格不够，该弃':'几乎持平（估算 ±'+mg+'%）';
+  }else{
+    ecls=eq>=55?'eqhi':eq>=35?'eqmid':'eqlo';
+    eqK='胜率';eqV=eq+'%';eqSub='不用跟注 · vs '+d.nOpp+' 家';
+  }
   row.innerHTML=
     '<div class="hud-seg pos"><span class="hud-k">位置</span><span class="hud-v">'+p[0]+'</span><span class="hud-sub">'+p[1]+'</span></div>'+
-    '<div class="hud-seg"><span class="hud-k">你的牌</span><span class="hud-v">'+escapeHTML(d.hand)+'</span><span class="hud-sub">'+d.nOpp+' 个对手</span></div>'+
-    '<div class="hud-seg eq"><span class="hud-k">胜率</span><span class="hud-v '+ecls+'">'+eq+'%</span><span class="hud-sub">'+eqSub+'</span></div>'+
+    '<div class="hud-seg hand" id="hudHand" title="点开看牌型大小"><span class="hud-k">你的牌 <span style="opacity:.6">🃏</span></span><span class="hud-v">'+escapeHTML(d.hand)+'</span><span class="hud-sub">'+d.nOpp+' 个对手 · 点看牌型</span></div>'+
+    '<div class="hud-seg eq"><span class="hud-k">'+eqK+'</span><span class="hud-v '+ecls+'">'+eqV+'</span><span class="hud-sub">'+eqSub+'</span></div>'+
     '<button class="hudtoggle" id="hudX" title="关闭新手提示（设置里可重开）">×</button>';
   row.style.display='flex';
+  var hh=$('hudHand');if(hh)hh.onclick=showHandRank; // 外审 B1:点"你的牌"看牌型大小
   $('hudX').onclick=function(){hudOn=false;persist();renderHUD();setStatus('新手提示已关。设置里可重新打开。');};
 }
 
@@ -2527,7 +2628,9 @@ try{$('verBadge').textContent='v'+APP_VERSION;}catch(e){}
 loadPersist();buildSeats();render();updateStatsPanelAndChart();renderRecords();renderCoach();
 $('btnDiag').onclick=()=>{renderCoach();};
 // 左上抽屉：开关 + 展开某节时按需刷新
-$('drawerBtn').onclick=openDrawer;$('drawerClose').onclick=closeDrawer;$('drawerBackdrop').onclick=closeDrawer;
+// 外审:☰ 在用户心里是开关 —— 点开着的 ☰ 应该收起,而不是无反应
+$('drawerBtn').onclick=function(){$('drawer').classList.contains('open')?closeDrawer():openDrawer();};
+$('drawerClose').onclick=closeDrawer;$('drawerBackdrop').onclick=closeDrawer;
 document.querySelectorAll('.dsec').forEach(function(d){d.addEventListener('toggle',function(){
   if(!d.open)return;var tab=d.getAttribute('data-tab');
   if(tab==='records')renderRecords();else if(tab==='coach')renderCoach();
