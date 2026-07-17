@@ -1,6 +1,15 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>德州 AI 教练 · 一秒开战</title>
+<!-- v0.27 PWA:加到主屏=全屏应用手感(原生 APP 由张宇清后续接力)。file:// 下这些只是死链,无害 -->
+<meta name="theme-color" content="#0a1c16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="德州AI教练">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="manifest" href='data:application/manifest+json,{"name":"德州 AI 教练","short_name":"德州AI教练","display":"standalone","orientation":"portrait","start_url":"https://cyruswu.github.io/verifiable-poker/","scope":"https://cyruswu.github.io/verifiable-poker/","background_color":"%230a1c16","theme_color":"%230a1c16","icons":[{"src":"https://cyruswu.github.io/verifiable-poker/icon-512.png","sizes":"512x512","type":"image/png"}]}'>
 <style>
   /* ============================================================
      德州 AI 教练 — 视觉系统 v0.5（Claude Design 重设计）
@@ -528,6 +537,60 @@
     .pagefoot{font-size:10.5px}
     .status{font-size:11.5px}
   }
+
+  /* ============================================================
+     v0.27 移动端应用式布局(朋友反馈:大部分人手机玩 → 移动端是第一公民)
+     核心:①满屏不滚动(100dvh 列布局)②操作条离开毡面,变成桌下固定拇指条
+         ③全部触控目标 ≥44px ④安全区(刘海/Home条)⑤页脚收进抽屉
+     只动 ≤760px,桌面布局零改动。放在样式表最后,覆盖此前所有移动规则。
+     ============================================================ */
+  @media(max-width:760px){
+    html,body{height:100%;overscroll-behavior-y:contain}
+    *{-webkit-tap-highlight-color:transparent}
+    button{touch-action:manipulation;user-select:none;-webkit-user-select:none}
+    .wrap{height:100dvh;display:flex;flex-direction:column;box-sizing:border-box;
+      padding:calc(6px + env(safe-area-inset-top)) 10px calc(6px + env(safe-area-inset-bottom));overflow:hidden}
+    .topbar{flex:0 0 auto;margin-bottom:2px}
+    h1{font-size:15px}
+    .topctl .btnlink{min-height:40px;padding:8px 11px}
+    /* 舞台吃满剩余高度,桌子弹性填充 */
+    .stage{flex:1 1 auto;min-height:0;margin-top:6px;display:flex}
+    .tablecol{flex:1;display:flex;flex-direction:column;min-height:0}
+    .tablewrap{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+    .tablewrap .table{flex:1 1 auto;height:auto!important;min-height:360px}
+    /* 操作条:从毡面上拿下来,变成桌下拇指条(不再遮牌桌) */
+    .controls{position:static;left:auto;bottom:auto;transform:none;width:100%;max-width:100%;
+      margin-top:7px;padding:8px 4px 2px;flex:0 0 auto;align-items:stretch;
+      background:transparent;border:none;box-shadow:none}
+    .controls .row{width:100%}
+    .controls button.act{min-height:50px;font-size:15px;border-radius:12px;flex:1 1 0;padding:10px 8px}
+    .controls #actRow{gap:8px}
+    .controls #nextRow button.act{width:100%}
+    /* 加注面板:整宽滑杆 + 2×2 快捷宫格 + 全宽确认 */
+    .controls #raiseRow{flex-direction:row;flex-wrap:wrap;gap:8px;padding:10px;max-width:100%}
+    .controls #raiseRow .rz{flex:1 1 100%;min-width:0}
+    .controls .quick{flex:1 1 40%;min-height:44px;font-size:13px}
+    .controls #btnConfirm{flex:1 1 100%;min-height:50px}
+    input[type=range]{-webkit-appearance:none;appearance:none;height:34px;background:transparent}
+    input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:var(--line2)}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;
+      background:linear-gradient(180deg,#e7c476,var(--brass));border:2px solid #f0d9a0;margin-top:-11px;
+      box-shadow:0 2px 8px rgba(0,0,0,.5)}
+    /* 预选/跳过:触控加大 */
+    #preRow .btnlink,#skipRow .btnlink{min-height:42px;padding:9px 13px;font-size:13px}
+    /* HUD 在拇指条顶部,决策段永不隐藏(v0.26 已定) */
+    #hudRow{padding:8px 8px}
+    .hudtoggle{width:30px;height:30px;font-size:13px}
+    /* 状态栏一行省空间 */
+    .status{flex:0 0 auto;margin:3px 0 0;font-size:11px;min-height:15px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* 页脚收进抽屉(🛡 可验证公平入口),省出一屏 */
+    .pagefoot{display:none}
+    /* 悬浮教练:默认停在桌面中上部,别压拇指条 */
+    .coachfloat{bottom:auto;top:96px;right:8px;max-height:46%}
+    /* 复盘条在弹性桌高下略上移 */
+    #replayBar{bottom:33%}
+  }
 </style>
 
 <div id="dupBanner" style="display:none;position:sticky;top:0;z-index:30;background:#3a1a1a;border-bottom:1px solid var(--loss);color:#ffd9d9;font-size:12.5px;padding:8px 14px;text-align:center">
@@ -536,7 +599,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.26.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.27.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -556,6 +619,7 @@
           <div class="drawerHead">☰ 菜单<button class="chbtn" id="drawerClose" style="margin-left:auto">×</button></div>
           <div class="drawerList">
             <button class="draweritem" id="rankBtn">🃏 牌型大小 · 怎么决定输赢</button>
+            <button class="draweritem" id="fairBtn">🛡 可验证公平 · 查上一手发牌</button>
             <button class="draweritem" id="lobbyBtn">🪑 牌桌设置 · 选谁陪你玩</button>
             <button class="draweritem" id="settingsBtn">⚙️ 桌面与责任设置</button>
             <details class="dsec" data-tab="records"><summary>🗂 牌局记录</summary><div class="dbody">
@@ -667,7 +731,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.26.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.27.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
     </div>
   </footer>
@@ -912,7 +976,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.26.0';
+var APP_VERSION='0.27.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -994,6 +1058,7 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
 $('rankBtn').onclick=function(){closeDrawer();showHandRank();};
+$('fairBtn').onclick=function(){closeDrawer();$('verifyBtn').onclick();}; // 手机页脚隐藏后,Verify 从抽屉可达
 $('rankClose').onclick=function(){$('rankModal').classList.remove('open');};
 $('rankModal').onclick=function(e){if(e.target===$('rankModal'))$('rankModal').classList.remove('open');};
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
