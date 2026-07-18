@@ -446,6 +446,15 @@
   @media(max-width:760px){.boardfloat{width:min(200px,52%);right:8px;top:8px;max-height:44%}
     .bfrow{font-size:10.5px}.lbadge{font-size:11px;padding:4px 9px}.lbadge .lb-nick{display:none}}
 
+  /* ---- v0.30 教学条(实战带打) ---- */
+  #teachBar{background:rgba(67,214,195,.07);border:1px solid rgba(67,214,195,.25);
+    border-left:3px solid var(--verify);border-radius:11px;padding:9px 12px;
+    font-size:12.5px;line-height:1.65;color:var(--ink);max-width:560px}
+  #teachBar b{color:#fff}
+  #teachBar .tlq{display:block;margin-top:4px;font-size:10.5px;color:var(--faint)}
+  #teachBar .tlq a{color:var(--faint);text-decoration:underline}
+  @media(max-width:760px){#teachBar{max-width:100%;font-size:12px}}
+
   /* ---- v0.22 经典复盘条 ---- */
   /* 高度受限:你有下注时筹码堆把手牌顶上来,缝只剩 ~123px。取舍:决策点(123px)正好塞进缝里零重叠;
      开场/揭示/收尾这些纯阅读相位允许向上盖住公共牌(文字里都写了),但底边锁死在手牌之上——你的牌永不被挡。 */
@@ -617,7 +626,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.29.0</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -636,6 +645,7 @@
         <div class="drawer" id="drawer">
           <div class="drawerHead">☰ 菜单<button class="chbtn" id="drawerClose" style="margin-left:auto">×</button></div>
           <div class="drawerList">
+            <button class="draweritem" id="teachBtn" style="border-color:rgba(67,214,195,.35)">🎓 新手教学 · 从零学会德扑</button>
             <button class="draweritem" id="rankBtn">🃏 牌型大小 · 怎么决定输赢</button>
             <button class="draweritem" id="fairBtn">🛡 可验证公平 · 查上一手发牌</button>
             <button class="draweritem" id="homeBtn">✨ 产品介绍 · 分享给朋友看这页</button>
@@ -681,6 +691,7 @@
         <!-- 操作按钮：紧凑，悬浮在 hero 手牌上方 -->
         <div class="controls" id="controls">
           <div class="row" id="hudRow" style="display:none"></div>
+          <div id="teachBar" style="display:none"></div>
           <div class="row" id="preRow" style="display:none">
             <span style="color:var(--dim);font-size:11px">预选</span>
             <button class="prebtn" id="preCF">过牌/弃牌</button>
@@ -753,7 +764,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.29.0</div>
+      <div class="foottitle">德州 AI 教练 · v0.30.0</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。<br><a href="home.html" style="color:var(--faint)">产品介绍页 →</a>
     </div>
   </footer>
@@ -1000,7 +1011,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.29.0';
+var APP_VERSION='0.30.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -1087,6 +1098,11 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
       handNo=Math.max(d.handNo||0, handLog.reduce((m,r)=>Math.max(m,r.id||0),0));}}
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
   }catch(e){}}
+$('teachBtn').onclick=function(){closeDrawer();
+  showModal('🎓 新手教学','从没玩过?规则记不清?两节课 + 一张表,玩几手就上道:',
+    [{label:'第一课 · 一手牌的一生 ▶',fn:function(){replayOpen('teach-1');}},
+     {label:'第二课 · 实战带打 3 手',fn:teachStart},
+     {label:'🃏 牌型大小表',fn:showHandRank}]);};
 $('rankBtn').onclick=function(){closeDrawer();showHandRank();};
 $('fairBtn').onclick=function(){closeDrawer();$('verifyBtn').onclick();}; // 手机页脚隐藏后,Verify 从抽屉可达
 $('homeBtn').onclick=function(){window.open('home.html','_blank');}; // 产品介绍页(新标签,不打断当前手)
@@ -1131,6 +1147,7 @@ function say(si,ev){var s=seats[si];if(!s.persona||!s.persona.talk)return;var ar
 function startHand(){
   if(replay)return; // 复盘模式下不发实盘牌(先退出复盘)
   cancelAutoNext(); // 手动/自动开局都先清倒计时,防双开
+  if(teachLive<=0){var _tb=$('teachBar');if(_tb)_tb.style.display='none';} // 非教学期不留教学条
   // ---- 责任博弈闸门（在发牌前拦） ----
   if(lossCap>0 && sessionNet<=-lossCap){ showModal('已达本会话损失上限',
     '本会话已亏 <b style="color:var(--loss)">'+(-sessionNet)+'</b>（你设的上限 '+lossCap+'）。<br>强制休息——真要继续，去设置里调，别在上头时改。',
@@ -1382,6 +1399,7 @@ function endHand(){
   }
   $('actRow').querySelectorAll('button').forEach(b=>b.disabled=true);
   $('actRow').style.display='none';$('raiseRow').style.display='none';$('nextRow').style.display='flex';
+  teachExplainHand();      // v0.30 实战带打:讲解这手谁赢、为什么(教学计数在里面递减,3手后毕业)
   scheduleAutoNext(delta); // v0.28:普通手 4s 自动开下一手;大赢/大输自动暂停留人
 }
 function updateStats(){/* placeholder for future */}
@@ -1995,6 +2013,7 @@ function enableHero(){
   $('btnCheck').textContent=canCheck?'过牌':('跟 '+Math.min(toCall,s.stack)+(toCall>=s.stack?' All-in':''));
   var maxTo=s.cStreet+s.stack,minTo=Math.max(currentBet+minRaise,currentBet+BB,BB);
   if(currentBet===0)minTo=Math.min(BB,maxTo);
+  if(teachLive>0)teachTip(); // 实战带打:轮到你先上人话提示
   $('btnRaise').disabled=!(s.mayRaise&&maxTo>currentBet&&s.stack>0);
   $('btnRaise').textContent=currentBet===0?'下注':(s.mayRaise?'加注':'只能跟/弃');
   $('raiseRow').style.display='none';
@@ -2100,6 +2119,119 @@ var CLASSICS=[
   lesson:'诈唬战里，<b>筹码深度就是胆量</b>。同样是没牌，能承受输的那个人下得出手。以及：对手的<b>最小加注</b>常常最可疑——真牌想要你的钱，不会给你便宜的价格。'
 }];
 
+/* ==================== 新手教学 (v0.30) ====================
+ * 目标人群(Cyrus 定):从没玩过 / 规则记不清的人。核心不是胜率,是基础玩法。
+ * 第一课=虚构教学手牌走复盘引擎(teach:true → 不判对错,只讲解);第二课=实战带打 3 手(teachLive)。
+ */
+var TEACH_HAND={
+  id:'teach-1', teach:true,
+  title:'第一课 · 一手牌的一生',
+  sub:'从拿到底牌到赢下底池,完整走一遍',
+  src:'教学手牌(虚构,为演示规则设计;非真实赛事)',
+  youAre:0,
+  intro:'德州扑克一句话:你有 2 张只有自己能看的「底牌」,桌面陆续发 5 张大家共用的「公共牌」,'+
+    '用这 7 张里最大的 5 张比大小,赢的人拿走桌上所有筹码(「底池」)。现在陪你完整打一手——每一步都有人话解释,放心按。',
+  bb:20,
+  seats:[{name:'你',emoji:'🧑',stack:1000,hole:['A♥','K♥'],role:'新手'},
+         {name:'老赵',emoji:'💰',stack:1000,hole:['9♣','9♦'],role:'陪练'}],
+  seed:{cStreet:[10,20],cHand:[10,20]}, // 单挑:你是小盲10,老赵大盲20——「盲注」=强制下注,保证每手都有东西可争
+  steps:[
+   {st:'preflop',board:[],act:[
+     {s:0,t:'raise',to:60,quiz:true,
+      why:'这两张 A♥K♥ 是你的「底牌」,只有你能看见。同花色的 A 和 K 是很强的起手牌。'+
+        '加注到 60 = 往底池多放钱,逼对方做选择:要么跟着掏钱,要么弃牌把已投入的让给你。'},
+     {s:1,t:'call',to:60,txt:'老赵跟注 60——他也想看接下来的公共牌'}]},
+   {st:'flop',board:['Q♥','7♥','2♠'],act:[
+     {s:1,t:'check',txt:'过牌 = 这轮先不下注,把决定权推给你(轮到你时你也可以过牌,免费看下一张)'},
+     {s:0,t:'raise',to:80,quiz:true,
+      why:'一次性发出的这 3 张叫「翻牌」,是公共牌,两家共用。你现在最大只是 A 高牌——但注意:'+
+        '桌上有两张红桃,你手里也有两张,再来任意一张红桃就凑成「同花」(5 张同色,很大的牌)。'+
+        '这叫「听牌」:牌还没成,但有指望。下注 80,对方弱就直接投降,不投降你还有同花的后路。'},
+     {s:1,t:'call',to:80,txt:'老赵跟注——他手里有一对 9,不肯走'}]},
+   {st:'turn',board:['Q♥','7♥','2♠','J♥'],act:[
+     {s:1,t:'check',txt:'老赵过牌'},
+     {s:0,t:'raise',to:200,quiz:true,
+      why:'第 4 张公共牌叫「转牌」。J♥ 来了——你的 A♥K♥ + 桌上 Q♥J♥7♥,凑齐 5 张红桃,'+
+        '「同花」成了!现在你几乎稳赢,下注 200 是「要价值」:牌大的时候要让对方付钱,而不是免费看牌。'},
+     {s:1,t:'call',to:200,txt:'老赵还是不信,跟注 200'}]},
+   {st:'river',board:['Q♥','7♥','2♠','J♥','3♣'],act:[
+     {s:1,t:'check',txt:'第 5 张「河牌」发完,最后一轮下注。老赵过牌'},
+     {s:0,t:'raise',to:300,quiz:true,
+      why:'公共牌发完了,牌面定型。你的同花没人能追了(除非他更大的同花——这里不可能)。'+
+        '最后再下注 300:让他为看你的牌付最后一次钱。'},
+     {s:1,t:'call',to:300,txt:'老赵不服,跟注看牌——「摊牌」时间到'}]}
+  ],
+  outcome:'摊牌:你亮出 A♥K♥,配上公共牌里的 Q♥ J♥ 7♥ = <b>同花</b>(5 张红桃)。老赵只有一对 9。'+
+    '同花 > 一对 → 底池 <b>1280</b> 全归你。',
+  lesson:'一手牌的一生:<b>2 张底牌 → 翻牌 3 张 → 转牌 1 张 → 河牌 1 张</b>,每轮之间都可以下注;'+
+    '最后用你的 2 张 + 公共 5 张里挑最大的 5 张比大小,赢者通吃底池。'+
+    '四个动作:<b>弃牌</b>=退出这手(已投入的不退);<b>过牌</b>=不下注往下看;<b>跟注</b>=付钱留在牌局;<b>加注</b>=逼对方付更多。'+
+    '下一步:去「第二课 · 实战带打」真打 3 手,桌上会一直有人话提示。'
+};
+CLASSICS.push(TEACH_HAND); // 挂进复盘引擎(teach:true 会让引擎只讲解、不判对错)
+
+/* ---- 第二课:实战带打(真牌局 + 教学条) ---- */
+var teachLive=0, teachSaved=null;
+function teachStart(){
+  if(replay)replayExit();
+  if(ladderMode){ladderExitMode();}                 // 教学是课堂,不进任何榜
+  teachSaved={hudOn:hudOn,coachMode:coachMode,selectedIds:selectedIds.slice(),tableTier:tableTier};
+  hudOn=true;                                        // HUD 是教具,课上强制开
+  if(coachMode)setCoachMode(false);                  // 教练闭嘴:两个声音同时讲话=信息过载
+  selectedIds=['whale'];tableTier=1;buildSeats();    // 单挑一条 L1 鱼,最温柔的对手
+  teachLive=3;closeDrawer();persist();render();
+  $('actRow').style.display='none';$('nextRow').style.display='flex';
+  setStatus('🎓 实战带打:接下来 3 手,桌上全程人话提示。点「开始新一手」。');
+  startHand();
+}
+function teachExit(restoreOnly){
+  teachLive=0;
+  var tb=$('teachBar');if(tb)tb.style.display='none';
+  if(teachSaved){hudOn=teachSaved.hudOn;if(teachSaved.coachMode)setCoachMode(true);
+    selectedIds=teachSaved.selectedIds;tableTier=teachSaved.tableTier;teachSaved=null;
+    if(!restoreOnly){buildSeats();handDone=true;render();
+      $('actRow').style.display='none';$('nextRow').style.display='flex';}}
+  persist();
+}
+function teachTip(){
+  if(teachLive<=0)return;
+  var tb=$('teachBar');if(!tb)return;
+  var s=seats[0],toCall=currentBet-s.cStreet;
+  var hand=escapeHTML(handDesc(s.hole,board));
+  var h='<b>🎓 你的牌:'+hand+'</b>　';
+  if(teachLive===3&&street==='preflop'){
+    h+='<br>三个按钮:<b>弃牌</b>=不玩了(已投入的不退)·<b>'+(toCall>0?'跟注':'过牌')+'</b>='+
+       (toCall>0?'付 '+toCall+' 继续看牌':'免费看下一张')+'·<b>加注</b>=逼对方付更多。没把握就弃,强牌就加。';
+  }else{
+    h+=toCall>0?('要跟 <b>'+toCall+'</b> 才能继续——牌不值就别付。'):'可以免费过牌看下一张。';
+  }
+  h+='<span class="tlq">还剩 '+teachLive+' 手带打 · <a href="javascript:void(0)" id="teachQuit">提前毕业</a></span>';
+  tb.innerHTML=h;tb.style.display='block';
+  var q=$('teachQuit');if(q)q.onclick=function(){teachExit();setStatus('🎓 已退出教学。想练随时回来。');};
+}
+function teachExplainHand(){
+  if(teachLive<=0)return;
+  var tb=$('teachBar');if(!tb)return;
+  var me=seats[0],opp=seats[1],h;
+  if(me.folded)h='你弃牌退出了这手——没再投入,损失止于之前下的注。弃牌不丢人,是最常用的动作。';
+  else if(opp&&opp.folded)h='对手弃牌,你<b>不用亮牌</b>直接收下底池——德扑很多手就是这么赢的,牌好不好没人知道。';
+  else if(me.revealed&&opp&&opp.revealed){
+    var mn=CATN[Math.floor(evalBestOf(me.hole.concat(board))/759375)],
+        on=CATN[Math.floor(evalBestOf(opp.hole.concat(board))/759375)];
+    var win=(me.resultDelta||0)>0;
+    h='摊牌:你是 <b>'+mn+'</b>,老赵是 <b>'+on+'</b> → '+(win?'你的大,底池归你。':(me.resultDelta<0?'他的大,底池归他。':'平分底池。'))+
+      '(不确定牌型大小?点抽屉里的「🃏 牌型大小」)';
+  }else h='本手结束。';
+  tb.innerHTML='<b>🎓 '+h+'</b>';tb.style.display='block';
+  teachLive--;persist();
+  if(teachLive<=0){cancelAutoNext();
+    showModal('🎓 毕业啦','3 手带打完成!你已经会:看懂自己的牌型、用对四个动作、明白怎么赢。<br><br>'+
+      '接下来去常规桌:<b>新手 HUD</b> 会继续告诉你位置/牌型/该不该跟,'+
+      '<b>教练模式</b>会在你每次出手后点评对错——就像刚才,但更专业。',
+      [{label:'去常规桌 ▶',fn:function(){teachExit();}},
+       {label:'再带打 3 手',fn:function(){teachSaved&&(teachSaved=null);teachStart();}}]);}
+}
+
 /* ---- 复盘引擎:重放脚本 + 决策点先考你 + 再揭示 ---- */
 var replay=null, replaySaved=null;
 function fmtK(n){var x=Math.abs(n);
@@ -2165,6 +2297,9 @@ function replayNext(){
 function replayAnswer(mine){
   var r=replay;if(!r||r.phase!=='quiz')return;
   var a=r.h.steps[r.si].act[r.ai];
+  if(r.h.teach){ // 教学手牌:不判对错——按什么都行,接着讲这一步是什么、为什么
+    r.verdict={teach:true,a:a};r.phase='verdict';
+    replayApply(a);r.ai++;render();replayRenderBar();return;}
   var aggressive=(a.t==='raise'||a.t==='bet'||a.t==='allin');
   var ok=aggressive?(mine==='raise'):(mine===a.t);
   r.asked++;if(ok)r.right++;
@@ -2181,11 +2316,12 @@ function replayRenderBar(){
   if(r.phase==='intro'){
     html='<div class="rpnarr"><b>'+h.title+'</b> · '+h.sub+'<br>'+h.intro+
       '<div class="rpsrc">📎 来源核实：'+h.src+'</div></div>'+
-      '<div class="rpbtns"><button class="act primary" id="rpNext">开始复盘 ▶</button></div>';
+      '<div class="rpbtns"><button class="act primary" id="rpNext">'+(h.teach?'开始上课 ▶':'开始复盘 ▶')+'</button></div>';
   }else if(r.phase==='done'){
     html='<div class="rpnarr"><b>结果</b>：'+h.outcome+'<br><br><b>这手教你什么</b>：'+h.lesson+
-      '<div class="rpsrc">你有 '+r.right+'/'+r.asked+' 个决策和高手一致。</div></div>'+
-      '<div class="rpbtns"><button class="act primary" id="rpNext">回到练习桌 ▶</button></div>';
+      (h.teach?'':'<div class="rpsrc">你有 '+r.right+'/'+r.asked+' 个决策和高手一致。</div>')+'</div>'+
+      '<div class="rpbtns">'+(h.teach?'<button class="act primary" id="rpTeach2">去第二课 · 实战带打 ▶</button>':'')+
+      '<button class="act'+(h.teach?'':' primary')+'" id="rpNext">回到练习桌 ▶</button></div>';
   }else if(r.phase==='quiz'){
     var s0=seats[h.youAre],mx=Math.max.apply(null,seats.map(function(s){return s.cStreet;}));
     var toCall=mx-s0.cStreet;
@@ -2198,6 +2334,10 @@ function replayRenderBar(){
       '<button class="act raise" data-rp="raise">'+(toCall>0?'加注':'下注')+'</button></div>';
   }else if(r.phase==='verdict'&&r.verdict){
     var v=r.verdict;
+    if(v.teach){ // 教学:不打勾叉,直接讲这一步
+      html='<div class="rpnarr rpquiz">👣 <b>这一步：'+replayActLabel(v.a)+'</b><br>'+v.a.why+'</div>'+
+        '<div class="rpbtns"><button class="act primary" id="rpNext">下一步 ▶</button></div>';
+    }else
     html='<div class="rpnarr '+(v.ok?'rpok':'rpno')+'">'+(v.ok?'✅ 和高手一样。':'❌ 高手不是这么打的。')+
       '　<b>'+me.name+' 实际：'+replayActLabel(v.a)+'</b><br>'+v.a.why+'</div>'+
       '<div class="rpbtns"><button class="act primary" id="rpNext">下一步 ▶</button></div>';
@@ -2210,12 +2350,13 @@ function replayRenderBar(){
   html+='<button class="btnlink" id="rpQuit" style="align-self:center">退出</button>';
   bar.innerHTML=html;
   var nb=$('rpNext');if(nb)nb.onclick=replayNext;
+  var t2=$('rpTeach2');if(t2)t2.onclick=function(){replayExit();teachStart();};
   $('rpQuit').onclick=replayExit;
   bar.querySelectorAll('[data-rp]').forEach(function(b){b.onclick=function(){replayAnswer(b.getAttribute('data-rp'));};});
 }
 function renderClassics(){
   var el=$('classicList');if(!el)return;
-  el.innerHTML=CLASSICS.map(function(c){
+  el.innerHTML=CLASSICS.filter(function(c){return !c.teach;}).map(function(c){ // 教学手牌走自己的「新手教学」入口,不混进经典赛事
     return '<button class="draweritem" data-cls="'+c.id+'" style="margin:4px 0">🎬 <b>'+c.title+'</b>'+
       '<div class="sub" style="margin-top:2px">'+c.sub+'</div></button>';}).join('');
   el.querySelectorAll('[data-cls]').forEach(function(b){b.onclick=function(){replayOpen(b.getAttribute('data-cls'));};});
@@ -2324,6 +2465,7 @@ function ladderEnterDialog(){
     [{label:'开打 ▶',fn:function(){
       var nick=(($('ltNick')||{}).value||'').trim().slice(0,16);
       if(!nick){setStatus('得先起个昵称才能进天梯。');return;}
+      if(teachLive>0)teachExit(true); // 课堂和赛场互斥:进天梯先下课(还原教学前设置)
       ladderNick=nick;ladderTier=pick;ladderMode=true;ladderView=pick;
       // 天梯 = 比赛:卸掉辅助轮。HUD 告诉你位置/牌型/胜率、教练告诉你对错——留着的话,
       // 榜量的就不是你的技术,是你跟提示的执行力。存下原设置,退出时还原。
