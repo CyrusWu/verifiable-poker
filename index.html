@@ -617,7 +617,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.28.1</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.29.0</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -638,6 +638,7 @@
           <div class="drawerList">
             <button class="draweritem" id="rankBtn">🃏 牌型大小 · 怎么决定输赢</button>
             <button class="draweritem" id="fairBtn">🛡 可验证公平 · 查上一手发牌</button>
+            <button class="draweritem" id="homeBtn">✨ 产品介绍 · 分享给朋友看这页</button>
             <button class="draweritem" id="lobbyBtn">🪑 牌桌设置 · 选谁陪你玩</button>
             <button class="draweritem" id="settingsBtn">⚙️ 桌面与责任设置</button>
             <details class="dsec" data-tab="records"><summary>🗂 牌局记录</summary><div class="dbody">
@@ -752,8 +753,8 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.28.1</div>
-      决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。
+      <div class="foottitle">德州 AI 教练 · v0.29.0</div>
+      决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。<br><a href="home.html" style="color:var(--faint)">产品介绍页 →</a>
     </div>
   </footer>
 </div>
@@ -999,7 +1000,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.28.1';
+var APP_VERSION='0.29.0';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -1088,6 +1089,7 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
   }catch(e){}}
 $('rankBtn').onclick=function(){closeDrawer();showHandRank();};
 $('fairBtn').onclick=function(){closeDrawer();$('verifyBtn').onclick();}; // 手机页脚隐藏后,Verify 从抽屉可达
+$('homeBtn').onclick=function(){window.open('home.html','_blank');}; // 产品介绍页(新标签,不打断当前手)
 $('rankClose').onclick=function(){$('rankModal').classList.remove('open');};
 $('rankModal').onclick=function(e){if(e.target===$('rankModal'))$('rankModal').classList.remove('open');};
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
