@@ -649,7 +649,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.2</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.3</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -787,7 +787,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.30.2</div>
+      <div class="foottitle">德州 AI 教练 · v0.30.3</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。<br><a href="home.html" style="color:var(--faint)">产品介绍页 →</a>
     </div>
   </footer>
@@ -1037,7 +1037,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.30.2';
+var APP_VERSION='0.30.3';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -1057,7 +1057,17 @@ var playerId='', ladderNick='',
     ladderURL='https://poker-ladder.cyruswu.workers.dev'; // v0.28.1 天梯已部署(2026-07-18),全员默认可见榜;设置里可改/清空
 var ladderMode=false, ladderTier=0;   // 是否在天梯模式 + 你选的联赛档位(1-5)
 var ladderExitPending=false;          // P0-5:手中点退出→标记,本手结算后再退(不丢当前 handRec、不改本手计分归属)
-var LADDER_ROSTER=['champ','prof','whale'], LADDER_CONFIG_ID='4max-default-v1'; // P0-6:天梯固定四人桌,人格用 ROSTER 默认,只有难度(tableTier)变——保证同榜可比
+// 天梯桌型随难度变(Cyrus 0720:不要固定四人,按难度定人数,4-6 人)。每档=固定人数+固定 roster+统一难度,同榜才可比。
+// 人数随档递增(对手越多越难):L1-2 四人 / L3-4 五人 / L5 六人满桌。ids 长度 = 人数-1(hero 之外的对手)。
+var LADDER_CONFIGS={
+  1:{n:4, ids:['whale','aunt','rock']},                 // L1 鱼:4 人,软对手
+  2:{n:4, ids:['whale','aunt','maniac']},               // L2 常客:4 人
+  3:{n:5, ids:['whale','aunt','rock','maniac']},         // L3 紧凶:5 人
+  4:{n:5, ids:['prof','champ','maniac','aunt']},         // L4 范围高手:5 人
+  5:{n:6, ids:['prof','champ','maniac','rock','aunt']}   // L5 宗师:6 人满桌
+};
+function ladderCfg(t){return LADDER_CONFIGS[t]||LADDER_CONFIGS[1];}
+function ladderConfigId(t){return 'L'+t+'-'+ladderCfg(t).n+'max-v1';} // 写进本手快照;人数变了 configId 就变,老口径成绩自然区分
 var ladderStats={};                   // {档位:{bb:累计大盲净额, hands:手数}} —— 每档独立成绩
 var ladderView=3;                     // 当前正在看的榜
 var ladderSyncT=null;                 // 自动同步防抖句柄
@@ -1219,7 +1229,7 @@ function startHand(){
   handRec={id:handNo,t:Date.now(),n:seats.length,btn:button,names:seats.map(s=>s.name),
     heroStart:heroStackStart,heroHole:seats[0].hole.map(code),
     actions:[],heroDecisions:[],board:[],holes:{},pot:0,rake:0,net:0,result:'',sawFlop:false,wentSD:false,flags:[]};
-  handRec.ladder=(ladderMode&&ladderTier&&tierAllSame()===ladderTier)?{eligible:true,tier:ladderTier,configId:LADDER_CONFIG_ID}:{eligible:false}; // P0-5:本手计分归属在发牌时冻结
+  handRec.ladder=(ladderMode&&ladderTier&&tierAllSame()===ladderTier)?{eligible:true,tier:ladderTier,configId:ladderConfigId(ladderTier)}:{eligible:false}; // P0-5:本手计分归属在发牌时冻结
   currentBet=0;minRaise=BB;
   log('—— 第 '+handNo+' 手 · '+seats.length+' 人 · commit '+commit.slice(0,10)+'… ——',true);
   // blinds
@@ -2521,7 +2531,7 @@ function ladderPush(cb){
 function ladderEnterDialog(){
   var pick=ladderTier||3;
   var tiers=[1,2,3,4,5].map(function(t){
-    return '<button class="ccbtn'+(t===pick?' on':'')+'" data-lt="'+t+'">L'+t+' '+AI_TIERS[t].n+'</button>';}).join('');
+    return '<button class="ccbtn'+(t===pick?' on':'')+'" data-lt="'+t+'">L'+t+' '+AI_TIERS[t].n+' · '+ladderCfg(t).n+'人</button>';}).join('');
   showModal('进入天梯模式',
     '<div style="font-size:12.5px;line-height:1.7">选一个难度当你的<b>联赛</b>。进入后<b>每一手都计入该榜并自动同步到公开榜单</b>；休闲局不计分。'+
     '<div class="ccrow" style="margin:10px 0"><span class="cck">难度</span><span class="ccbtns" id="ltPick">'+tiers+'</span></div>'+
@@ -2530,7 +2540,7 @@ function ladderEnterDialog(){
     '<div class="cf note" style="margin:8px 0"><b>⚔️ 天梯是比赛，辅助轮会卸掉</b>：进入后 <b>新手 HUD 与教练模式自动关闭并锁死</b>——'+
     '留着的话，榜量的就不是你的技术，是你跟提示的执行力。退出天梯后原样还原。</div>'+
     '<div style="color:var(--dim);font-size:11.5px">榜内口径 = <b>BB/100</b>（每百手赢几个大盲），满 '+LADDER_MIN_HANDS+' 手才上榜。'+
-    '随时可退出。天梯是<b>固定四人桌</b>（陈冠军·K教授·老赵，人格统一、只有难度随你选的联赛变），这样同榜成绩才可比；桌布换成竞技场。</div></div>',
+    '随时可退出。天梯<b>桌型随难度定</b>（L1-2 四人 / L3-4 五人 / L5 六人满桌，对手越多越难），每档人数与 roster 固定、同榜成绩才可比；桌布换成竞技场。</div></div>',
     [{label:'开打 ▶',fn:function(){
       var nick=(($('ltNick')||{}).value||'').trim().slice(0,16);
       if(!nick){setStatus('得先起个昵称才能进天梯。');return;}
@@ -2540,7 +2550,7 @@ function ladderEnterDialog(){
       // 天梯 = 比赛:卸掉辅助轮 + 固定桌型。存下原 HUD/教练/桌型,退出时全还原。
       ladderSaved={hudOn:hudOn,coachMode:coachMode,selectedIds:selectedIds.slice(),tableTier:tableTier}; // P0-6:也存桌型
       hudOn=false;if(coachMode)setCoachMode(false);
-      selectedIds=LADDER_ROSTER.slice();tableTier=pick;buildSeats(); // P0-6:固定四人桌(陈冠军/K教授/老赵),只有难度变
+      selectedIds=ladderCfg(pick).ids.slice();tableTier=pick;buildSeats(); // 天梯桌:该档固定人数+固定 roster(4-6 人随难度)
       // 桌面:进天梯默认亮出排行榜。手机:默认收起——屏太窄,常驻榜会盖住对手座位(实测挡住 2 家);
       // 标识已经说明在打天梯,榜改成"点 📊 想看才浮出来"。
       boardShow=(window.innerWidth>760);
