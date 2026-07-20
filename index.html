@@ -649,7 +649,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.4</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.5</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -787,7 +787,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.30.4</div>
+      <div class="foottitle">德州 AI 教练 · v0.30.5</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。<br><a href="home.html" style="color:var(--faint)">产品介绍页 →</a>
     </div>
   </footer>
@@ -1037,7 +1037,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.30.4';
+var APP_VERSION='0.30.5';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -1525,7 +1525,7 @@ function handRecDigest(r){
     JSON.stringify(r.ladder||{}),
     JSON.stringify((r.actions||[]).map(function(a){return [a.st,a.seat,a.type,a.to,a.folded?1:0];})),
     // M3:绑定 heroDecisions 的完整决策数学(改 eqv/potOdds/err/spr/outs 也会验证失败)+ 诊断 flags
-    JSON.stringify((r.heroDecisions||[]).map(function(d){return [d.st,d.act,d.amtTo,d.toCall,d.eqv,d.err,d.potOdds,d.spr,(d.outs&&d.outs.strong)||0];})),
+    JSON.stringify((r.heroDecisions||[]).map(function(d){return [d.st,d.act,d.amtTo,d.toCall,d.eqv,d.err,d.potOdds,d.spr,d.outs||0];})),
     JSON.stringify((r.flags||[]).map(function(f){return [f.sev,f.msg];}))
   ].join('|');
 }
@@ -1920,6 +1920,7 @@ var pendingFn=null; // 跳过本局时直接催发挂起的动作
 function schedule(fn,delay){var g=gen;pendingFn=fn;
   pendingTimer=setTimeout(function(){pendingTimer=null;pendingFn=null;if(g!==gen)return;fn();},turbo?20:delay);}
 function skipHand(){ // 你已不在手,一键快进机器人局(v0.16)
+  if(!guardPrimary())return; // bug2:非主标签零副作用
   if(handDone||!heroOut())return;turbo=true;
   if(pendingTimer){clearTimeout(pendingTimer);pendingTimer=null;var f=pendingFn;pendingFn=null;if(f)f();}}
 function heroOut(){return !seats[0]||!seats[0].inHand||seats[0].folded;} // 你已弃牌/不在手 → 机器人局 3 倍速快进
@@ -1935,6 +1936,24 @@ function promptOrBot(){
     }
     enableHero();return;}
   disableHero();var d=650+Math.random()*600;schedule(function(){decideSeat(toAct);},heroOut()?d/3:d);
+}
+// ---- 多标签接管/降级(Codex 收口)----
+// 所有游戏控件入口先过这个;非主标签零副作用(不只是 applyAction 末端拦)
+function guardPrimary(){if(isPrimary)return true;setStatus('本页只读预览——点顶部「接管本页」再操作。');return false;}
+// 降级只读:停掉本标签的游戏循环(作废挂起的机器人/动作定时器),别在后台偷跑机器人
+function becomeReadonly(){
+  isPrimary=false;preAction=null;
+  gen++;if(pendingTimer){clearTimeout(pendingTimer);pendingTimer=null;pendingFn=null;}
+  cancelAutoNext();var db=$('dupBanner');if(db)db.style.display='block';
+  try{render();}catch(_){}
+}
+// 接管:重启当前手的循环——否则机器人不再排、按钮全灰、整手卡死
+function becomePrimary(){
+  isPrimary=true;var db=$('dupBanner');if(db)db.style.display='none';
+  gen++;if(pendingTimer){clearTimeout(pendingTimer);pendingTimer=null;pendingFn=null;} // 清掉过期残留定时器
+  persist();
+  try{render();if(!handDone)promptOrBot();}catch(_){} // 从当前 toAct 恢复:机器人该动就重排,轮到你就亮按钮
+  setStatus('已接管本页（存档以本页为准，其他标签转为只读预览）。');
 }
 /* ---- 操作模型:座位 model≠local → 走中继决策;否则本地启发式 ---- */
 function styleName(x){if(!x.persona)return '';var P=x.persona;return (P.loose>0.55?'松':'紧')+'-'+(P.aggr>0.55?'凶':'被动');}
@@ -2108,14 +2127,14 @@ function setAmt(v){var s=$('slider'),mn=+s.min,mx=+s.max,step=+s.step||1;
   v=Math.max(mn,Math.min(mx,v));
   var snapped=Math.min(mx,mn+Math.round((v-mn)/step)*step);
   s.value=snapped;$('amt').textContent=s.value;return +s.value;}
-function openRaise(){var c=raiseCtx,s=$('slider');s.min=c.minTo;s.max=c.maxTo;s.step=BB/2;
+function openRaise(){if(!guardPrimary())return;var c=raiseCtx,s=$('slider');s.min=c.minTo;s.max=c.maxTo;s.step=BB/2;
   var potNow=totalPot();setAmt(seats[0].cStreet+Math.round(potNow*0.66));$('raiseRow').style.display='flex';}
 // hero handlers guard on (handDone||toAct!==0) → idempotent, blocks double-submit & out-of-turn clicks
 $('btnFold').onclick=()=>{if(handDone||toAct!==0)return;applyAction(0,'fold');};
 $('btnCheck').onclick=()=>{if(handDone||toAct!==0)return;applyAction(0,(currentBet-seats[0].cStreet)===0?'check':'call');};
 $('btnRaise').onclick=openRaise;
 $('slider').oninput=e=>$('amt').textContent=e.target.value;
-$('btnConfirm').onclick=()=>{if(handDone||toAct!==0)return;
+$('btnConfirm').onclick=()=>{if(!guardPrimary())return;if(handDone||toAct!==0)return;
   var v=+$('slider').value,maxTo=seats[0].cStreet+seats[0].stack,potNow=totalPot();
   var isBet=(currentBet===0),word=isBet?'下注':'加注到';
   // 超池二次确认只对**真正的超池大注**(投入额>底池 且 不是最小合法注)——最小加注被吸附后不该弹"肥手指"警告(外审 A3)
@@ -3060,8 +3079,8 @@ $('coachBtn').onclick=function(){setCoachMode(!coachMode);};
 $('btnCoachClose').onclick=function(){setCoachMode(false);};
 if(coachMode)setCoachMode(true);
 // v0.16:预选动作(再点取消) + 跳过本局
-$('preCF').onclick=function(){preAction=preAction==='checkfold'?null:'checkfold';preActionBet=currentBet;renderPre();};
-$('preCall').onclick=function(){preAction=preAction==='call'?null:'call';preActionBet=currentBet;renderPre();};
+$('preCF').onclick=function(){if(!guardPrimary())return;preAction=preAction==='checkfold'?null:'checkfold';preActionBet=currentBet;renderPre();};
+$('preCall').onclick=function(){if(!guardPrimary())return;preAction=preAction==='call'?null:'call';preActionBet=currentBet;renderPre();};
 $('btnSkip').onclick=skipHand;
 // 点开即玩:首次访问(没有任何牌局记录)自动发第一手,朋友点开 3 秒内在打牌
 setTimeout(function(){if(isPrimary&&handDone&&!handLog.length&&!isBlockingUIOpen())startHand();},900); // L1:首访自动开局也尊重统一阻断闸(抽屉/复盘/任一弹窗打开→不背后发牌)
@@ -3097,9 +3116,9 @@ document.addEventListener('keydown',function(e){
   bc.postMessage({t:'ping',id:myId});
   bc.onmessage=function(e){var m=e.data;if(!m||m.id===myId)return;
     if(m.t==='ping')bc.postMessage({t:'pong',id:myId,to:m.id});           // 我在，回应新来的
-    else if(m.t==='pong'&&m.to===myId&&pinging){isPrimary=false;preAction=null;$('dupBanner').style.display='block';try{cancelAutoNext();render();}catch(_){}} // 我是后来者→只读(出手/发牌已被 isPrimary 拦)
-    else if(m.t==='takeover'){isPrimary=false;preAction=null;$('dupBanner').style.display='block';try{cancelAutoNext();render();}catch(_){}} // H3/P2-1:别的标签接管→我立即降级只读、清预选/停自动发牌,旧主彻底让位
+    else if(m.t==='pong'&&m.to===myId&&pinging)becomeReadonly();          // 我是后来者→只读并停循环
+    else if(m.t==='takeover')becomeReadonly();                            // 别的标签接管→我降级只读并停循环(不再后台跑机器人)
   };
-  $('btnTakeover').onclick=function(){isPrimary=true;$('dupBanner').style.display='none';bc.postMessage({t:'takeover',id:myId});persist();try{render();}catch(_){}setStatus('已接管本页（存档以本页为准，其他标签转为只读预览）。');};
+  $('btnTakeover').onclick=function(){bc.postMessage({t:'takeover',id:myId});becomePrimary();}; // 先广播让旧主让位,再重启本手循环
 }catch(err){}})();
 </script>
