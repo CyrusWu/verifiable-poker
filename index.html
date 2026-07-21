@@ -275,6 +275,9 @@
     border:1px solid var(--line);box-shadow:0 14px 36px rgba(0,0,0,.6)}
   .coachfloat.min{max-height:none}
   .coachfloat.min .coachchat{display:none}
+  /* Codex4:桌面教练最小化时,收起条也显示最新一条点评(否则出手后好坏信号只进隐藏历史,等于白点评) */
+  .coachfloat.min .coachtick{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--ink)}
+  .coachfloat.min .coachhead #coachHeadSub{display:none}
   .coachfloat.min .coachcfg{display:none}   /* 外审 A4:最小化要连设置区一起收,否则手机上仍留 ~130px 面板 */
   .coachhead{display:flex;align-items:center;gap:7px;padding:8px 10px;cursor:grab;
     border-bottom:1px solid var(--line);font-family:var(--disp);font-weight:650;font-size:12.5px;
@@ -649,7 +652,7 @@
 <div class="wrap">
   <div class="topbar" style="align-items:center">
     <div>
-      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.6</span></h1>
+      <h1>♠ 德州 AI 教练 <span style="color:var(--dim);font-weight:400;font-size:14px">· 一秒开战</span> <span class="ver" id="verBadge">v0.30.7</span></h1>
     </div>
     <div class="topctl">
       <!-- 天梯模式标识:一眼看出在打天梯 + 什么级别 -->
@@ -671,7 +674,6 @@
             <button class="draweritem" id="teachBtn" style="border-color:rgba(67,214,195,.35)">🎓 新手教学 · 从零学会德扑</button>
             <button class="draweritem" id="rankBtn">🃏 牌型大小 · 怎么决定输赢</button>
             <button class="draweritem" id="fairBtn">🛡 可验证公平 · 查上一手发牌</button>
-            <button class="draweritem" id="homeBtn">✨ 产品介绍 · 分享给朋友看这页</button>
             <button class="draweritem" id="lobbyBtn">🪑 牌桌设置 · 选谁陪你玩</button>
             <button class="draweritem" id="settingsBtn">⚙️ 桌面与责任设置</button>
             <details class="dsec" data-tab="records"><summary>🗂 牌局记录</summary><div class="dbody">
@@ -787,7 +789,7 @@
         <button class="btnlink" id="verifyBtn">Verify ✓</button></span>
     </div>
     <div class="fairfoot" style="text-align:right">
-      <div class="foottitle">德州 AI 教练 · v0.30.6</div>
+      <div class="foottitle">德州 AI 教练 · v0.30.7</div>
       决策 100% 本地启发式 · 可验证；模型只驱动对手/教练风味，碰不到发牌。<br><a href="home.html" style="color:var(--faint)">产品介绍页 →</a>
     </div>
   </footer>
@@ -810,7 +812,7 @@
     <div class="slider-row"><span>黏性(爱跟)</span><input type="range" id="sSticky" min="0" max="100"><span class="v" id="vSticky">0</span></div>
   </div>
   <div class="field"><label>对话提示词（留给"嘴"层：桌上聊天/复盘解说）</label><textarea id="cfgPrompt"></textarea></div>
-  <div class="field"><label>对话模型</label>
+  <div class="field" id="cfgModelField"><label>对话模型 <span style="color:var(--faint);font-weight:400">· 进阶</span></label>
     <select id="cfgModel">
       <option value="local">本地模板声音（默认·即时·离线）</option>
       <option value="claude-opus-4-8">claude-opus-4-8</option>
@@ -1037,7 +1039,7 @@ var ROSTER=[
 function clonePersona(p){return JSON.parse(JSON.stringify(p));}
 
 /* ==================== state ==================== */
-var APP_VERSION='0.30.6';
+var APP_VERSION='0.30.7';
 var SB=10,BB=20,START=1000;
 var seats=[];            // seat objects around table (index 0 = hero)
 var deck=[],board=[],boardStart=0,nDealt=0;
@@ -1144,8 +1146,9 @@ function loadPersist(){try{var d=JSON.parse(localStorage.getItem('vpoker_multi')
         fairDone={serverSeed:_lr.serverSeed,commit:_lr.commit,clientSeed:_lr.clientSeed,nonce:_lr.nonce,seedHex:_sh,
           order:shuffleWith(fullDeck(),_sh).map(code),nDealt:_lr.nDealt,algo:_lr.algo};}
     }}
+  else coachMode=true; // 首访(无存档/旧schema):核心卖点=实时教练,默认开;回访(有存档)尊重上次选择
   // 更早/未知 schema 版本忽略（重新开始）而非崩溃
-  }catch(e){}}
+  }catch(e){coachMode=true;}}
 $('teachBtn').onclick=function(){closeDrawer();
   showModal('🎓 新手教学','从没玩过?规则记不清?两节课 + 一张表,玩几手就上道:',
     [{label:'第一课 · 一手牌的一生 ▶',fn:function(){replayOpen('teach-1');}},
@@ -1153,7 +1156,6 @@ $('teachBtn').onclick=function(){closeDrawer();
      {label:'🃏 牌型大小表',fn:showHandRank}]);};
 $('rankBtn').onclick=function(){closeDrawer();showHandRank();};
 $('fairBtn').onclick=function(){closeDrawer();$('verifyBtn').onclick();}; // 手机页脚隐藏后,Verify 从抽屉可达
-$('homeBtn').onclick=function(){window.open('home.html','_blank');}; // 产品介绍页(新标签,不打断当前手)
 $('rankClose').onclick=function(){$('rankModal').classList.remove('open');};
 $('rankModal').onclick=function(e){if(e.target===$('rankModal'))$('rankModal').classList.remove('open');};
 $('settingsBtn').onclick=()=>{closeDrawer();$('setRakePct').value=rakePct;$('setRakeCap').value=rakeCap;$('setShowBB').checked=showBB;
@@ -2763,7 +2765,7 @@ function renderHUD(){
     ecls=(jp.verdict==='call')?'eqhi':(jp.verdict==='fold')?'eqlo':'eqmid';
     eqK='该不该跟';
     eqV=eq+'% '+(jp.verdict==='call'?'>':jp.verdict==='fold'?'<':'≈')+' 门槛 '+th+'%';
-    eqSub=(jp.verdict==='call')?'价格够，可以跟':(jp.verdict==='fold')?'价格不够，该弃':'几乎持平（估算 ±'+mgp+'%）';
+    eqSub=(jp.verdict==='call')?'价格够，可以跟':(jp.verdict==='fold')?'价格不够，该弃':'临界·跟弃都行（±'+mgp+'%，新手偏弃）'; // Codex4:临界也给人话答案,别只丢"几乎持平"让新手自己翻译
   }else{
     ecls=eq>=55?'eqhi':eq>=35?'eqmid':'eqlo';
     eqK='胜率';eqV=eq+'%';eqSub='不用跟注 · vs '+d.nOpp+' 家';
@@ -2960,6 +2962,7 @@ function openConfig(si){
   $('cfgTitle').textContent='配置 · '+s.emoji+' '+s.name;
   $('cfgName').value=s.name;$('cfgEmoji').value=s.emoji;$('cfgPersona').value=P.persona||'';
   $('cfgPrompt').value=P.prompt||'';$('cfgModel').value=P.model||'local';
+  $('cfgModelField').style.display=relayURL?'':'none'; // 🟡:没配本地中继(离线单文件的默认)就藏起这条死路,配了中继的进阶用户才显示
   $('cfgTier').innerHTML=[1,2,3,4,5].map(function(i){return '<option value="'+i+'">'+AI_TIERS[i].b+' '+AI_TIERS[i].n+'</option>';}).join('');
   $('cfgTier').value=String(P.tier||P.natTier||2);
   $('cfgTierDesc').textContent=AI_TIERS[$('cfgTier').value].d;
@@ -3052,6 +3055,7 @@ function setStatus(h){$('status').innerHTML=h;}
 /* ==================== boot ==================== */
 try{$('verBadge').textContent='v'+APP_VERSION;}catch(e){}
 loadPersist();buildSeats();render();updateStatsPanelAndChart();renderRecords();renderCoach();
+try{if(coachMode)setCoachMode(true);}catch(e){} // 把 coachMode 应用到 UI(首访默认开的教练要真的显示出来;天梯态由 setCoachMode 内部拦)
 $('btnDiag').onclick=()=>{renderCoach();};
 // 左上抽屉：开关 + 展开某节时按需刷新
 // 外审:☰ 在用户心里是开关 —— 点开着的 ☰ 应该收起,而不是无反应
